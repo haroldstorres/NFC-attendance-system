@@ -1308,10 +1308,11 @@ $('simBtn').onclick=async()=>{
 // --- Excel export (SheetJS is loaded only when someone taps an Excel button)
 let xlsxP=null;
 const loadXlsx=()=>window.XLSX?Promise.resolve(window.XLSX):(xlsxP=xlsxP||new Promise((ok,no)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';s.onload=()=>ok(window.XLSX);s.onerror=()=>{xlsxP=null;no(new Error('load'))};document.head.appendChild(s)}));
-async function saveXlsx(name,sheet,rows){
-  try{const X=await loadXlsx(),ws=X.utils.aoa_to_sheet(rows),wb=X.utils.book_new();
-    ws['!cols']=rows[0].map((_,i)=>({wch:Math.min(40,Math.max(6,...rows.slice(0,200).map(r=>String(r[i]==null?'':r[i]).length))+2)}));
-    X.utils.book_append_sheet(wb,ws,sheet.slice(0,31));X.writeFile(wb,name+'-'+new Date().toISOString().slice(0,10)+'.xlsx');toast('Excel file saved')}
+async function saveXlsx(name,sheet,rows,more){
+  try{const X=await loadXlsx(),wb=X.utils.book_new();
+    [[sheet,rows]].concat(more||[]).forEach(([sn,rw])=>{const ws=X.utils.aoa_to_sheet(rw);
+      ws['!cols']=rw[0].map((_,i)=>({wch:Math.min(40,Math.max(6,...rw.slice(0,200).map(r=>String(r[i]==null?'':r[i]).length))+2)}));
+      X.utils.book_append_sheet(wb,ws,sn.slice(0,31))});X.writeFile(wb,name+'-'+new Date().toISOString().slice(0,10)+'.xlsx');toast('Excel file saved')}
   catch(e){toast('Could not make the Excel file. Check the internet connection and try again.')}}
 $('logXlsx').onclick=()=>{
   const fl=logState.flags||{};
@@ -1319,6 +1320,7 @@ $('logXlsx').onclick=()=>{
 $('visXlsx').onclick=()=>{const L=d=>new Date(d).toLocaleString('en-PH');
   saveXlsx('visitors','Visitors',[['Name','Purpose','Visiting','Time in','Time out']].concat(visDay.map(v=>[v.name||'',v.purpose||'',v.visiting||'',L(v.timeIn),v.timeOut?L(v.timeOut):'Still inside'])))};
 $('sfXlsx').onclick=()=>{
+  if(sfMode==='r'&&sfRepX)return saveXlsx('monthly-report','Summary',repSummary(),[['Learners',repLearners()]]);
   if(sfMode==='s'&&sfSum){const S=sfSum;
     return saveXlsx('sf2-summary','Summary',[['Name','Sex'].concat(SFMO.map(m=>'Present '+m),['Present TOTAL'],SFMO.map(m=>'Absent '+m),['Absent TOTAL'])].concat(S.rows.map(r=>[r.kid.name||'',r.kid.sex||''].concat(r.att,[sumT(r.att)],r.ab,[sumT(r.ab)]))))}
   if(!sfLast){toast('Generate the report first.');return}
@@ -1554,11 +1556,17 @@ function drawSF2(){sfMode='m';
 function fitSF(){const v=document.querySelector('.sfview'),p=v&&v.firstElementChild;if(!p||!v.clientWidth)return;p.style.zoom=Math.min(1,v.clientWidth/1100)}
 window.addEventListener('resize',fitSF);
 // --- Monthly report: one printed page for the month (summary, by section, absences, late, daily counts)
+let sfRepX=null;
+const repLearners=()=>{const R=sfRepX;return [['Name','Section','Class days','Present (incl. late)','Absent','Excused','Late','Longest absent streak','Attendance %']].concat(R.rows.map(x=>[x.kid.name||'',x.kid.section||'',R.sd,x.pres,x.abs,x.exc,x.tar,x.streak,R.sd?Math.round(x.pres/R.sd*100):0]))};
+const repSummary=()=>{const R=sfRepX,sm=(f)=>R.rows.reduce((t,x)=>t+f(x),0),secs=[...new Set(R.rows.map(x=>x.kid.section||'No section'))].sort(cmp);
+  return [['Month',R.mon],['Section',R.sec],['Class days',R.sd],['Learners',R.rows.length],['Average daily attendance %',R.sd&&R.rows.length?Math.round(sm(x=>x.pres)/(R.rows.length*R.sd)*100):0],['Absences',sm(x=>x.abs)],['Excused absences',sm(x=>x.exc)],['Late arrivals',sm(x=>x.tar)],[],['Section','Learners','Average daily attendance %','Absences','Excused','Late']]
+    .concat(secs.map(n=>{const g=R.rows.filter(x=>(x.kid.section||'No section')===n);return [n,g.length,R.sd&&g.length?Math.round(g.reduce((t,x)=>t+x.pres,0)/(g.length*R.sd)*100):0,g.reduce((t,x)=>t+x.abs,0),g.reduce((t,x)=>t+x.exc,0),g.reduce((t,x)=>t+x.tar,0)]}))};
 function drawRep(){sfMode='r';
   const L=sfLast,r=sfCalc(),sd=r.schoolDays,v=i=>esc($(i).value),pc=(a,b)=>b?Math.round(a/b*100)+'%':'–',
     mon=new Date(L.y,L.m-1,1).toLocaleString('en-PH',{month:'long',year:'numeric'}),
     exc={};(L.adj||[]).forEach(a=>{if(a.status==='A'&&a.excused)exc[a.kidId+'|'+a.day]=1});
   const rows=r.rows.map(x=>{let e=0;x.marks.forEach((m,i)=>{if(m==='A'&&exc[x.kid.id+'|'+(i+1)])e++});return {...x,exc:e,pres:Math.max(0,sd-x.abs)}});
+  sfRepX={rows,sd,mon,sec:L.sec||'All sections'};
   const N=rows.length,sum=(a,f)=>a.reduce((t,x)=>t+f(x),0),presT=sum(rows,x=>x.pres),absT=sum(rows,x=>x.abs),excT=sum(rows,x=>x.exc),tarT=sum(rows,x=>x.tar),perfect=rows.filter(x=>sd&&!x.abs&&!x.tar).length;
   const tile=(b,t)=>`<div><b>${b}</b><span>${t}</span></div>`;
   const secs=[...new Set(rows.map(x=>x.kid.section||'No section'))].sort(cmp);
@@ -1570,7 +1578,7 @@ function drawRep(){sfMode='r';
   const cd=r.days.map((d,i)=>({d,i})).filter(x=>x.d.cls),WD=['S','M','T','W','T','F','S'];
   const cnt=(i,m)=>rows.filter(x=>x.marks[i]===m).length;
   const daily=cd.length?`<h3>Daily attendance</h3><table class="dy"><thead><tr><th></th>${cd.map(x=>`<th>${x.d.d}<br>${WD[x.d.wd]}</th>`).join('')}</tr></thead><tbody>${[['Present','P'],['Late','T'],['Absent','A']].map(([t,m])=>`<tr><th>${t}</th>${cd.map(x=>`<td>${cnt(x.i,m)}</td>`).join('')}</tr>`).join('')}</tbody></table>`:'';
-  $('sfOut').innerHTML=`<div class="noprint note">Monthly report. Use Print / PDF above. Copy CSV and Excel still export the SF2 data.</div>
+  $('sfOut').innerHTML=`<div class="noprint note">Monthly report. Use Print / PDF above. Copy CSV and Excel export this report's figures.</div>
   <div class="rp"><div class="rh"><img alt="Logo left" src="${sfLogoCur}"><div class="rt"><span>${v('sfSchool')}</span><b>Monthly Attendance Report</b><span>${esc(mon)} | ${esc(L.sec||'All sections')}</span><span>School Year ${v('sfYear')}</span></div><img class="r" alt="Logo right" src="${sfLogoCur2}"></div>
   ${sd?`<div class="tl">${tile(sd,'Class days')}${tile(N,'Learners')}${tile(pc(presT,N*sd),'Average daily attendance')}${tile(absT,'Absences ('+excT+' excused)')}${tile(tarT,'Late arrivals')}${tile(perfect,'Perfect attendance')}</div>`:'<p class="none">No class days with taps were recorded for this month.</p>'}
   ${sd?bySec+`<h3>Learners with 3 or more absences</h3>`+tbl(chronic,[['Absent',x=>x.abs],['Excused',x=>x.exc],['Late',x=>x.tar],['Longest absent streak',x=>x.streak],['Attendance',x=>pc(x.pres,sd)]])
@@ -1583,7 +1591,8 @@ $('sfRep').onclick=async()=>{const [y,m]=($('sfMonth').value||'').split('-').map
   if(sfLast&&sfLast.y===y&&sfLast.m===m&&sfLast.sec===sec)drawRep()};
 
 $('sfPrint').onclick=()=>{if(!$('sfOut').firstChild){toast('Generate the report first.');return}window.print()};
-$('sfCsv').onclick=()=>{if(sfMode==='s'&&sfSum)return sfSumCsv();if(!sfLast){toast('Generate the report first.');return}
+$('sfCsv').onclick=()=>{if(sfMode==='s'&&sfSum)return sfSumCsv();
+  if(sfMode==='r'&&sfRepX){const q=x=>'"'+String(x).replace(/"/g,'""')+'"',rows=repLearners().map(r=>r.map(q).join(',')).join('\n');return navigator.clipboard&&navigator.clipboard.writeText(rows).then(()=>toast('Report CSV copied'),()=>toast('Could not copy'))}if(!sfLast){toast('Generate the report first.');return}
   const r=sfCalc(),cd=r.days.filter(x=>x.cls);
   const rows=['Name,Sex,'+cd.map(x=>x.d).join(',')+',Absent,Tardy'].concat(r.rows.map(x=>`"${x.kid.name}",${x.kid.sex||''},${r.days.map((d,i)=>d.cls?x.marks[i]:null).filter(v=>v!==null).join(',')},${x.abs},${x.tar}`)).join('\n');
   navigator.clipboard&&navigator.clipboard.writeText(rows).then(()=>toast('CSV copied (P present, T late, A absent)'),()=>toast('Could not copy'))};
