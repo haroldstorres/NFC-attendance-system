@@ -421,6 +421,22 @@ body.is-login #toast{background:#fff;color:#16323a;box-shadow:0 6px 20px rgba(0,
 .vwrap{overflow-x:auto}
 .vt{width:100%;border-collapse:collapse;font-size:.9rem}.vt th,.vt td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top}.vt th{color:var(--mute);font-weight:600;white-space:nowrap}.vt td.t{white-space:nowrap}
 .vcard{display:flex;gap:8px;align-items:center;justify-content:space-between;margin-top:8px;flex-wrap:wrap}
+/* Colorful cards: every tab has a tone; status colors (present, late, absent) stay the same everywhere */
+:root{--tg:#17784d;--ta:#9a5f00;--tr:#c2410c;--tb:#0b5f8a;--tp:#6b4fd1;--tt:#0f766e;--ts:#475569;--on:#fff;--tone:var(--tt)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--tg:#4cc790;--ta:#f2b233;--tr:#f08a5d;--tb:#7fd0e6;--tp:#b7a2ff;--tt:#5eead4;--ts:#a3b8c8;--on:#0a1d2c}}
+:root[data-theme="dark"]{--tg:#4cc790;--ta:#f2b233;--tr:#f08a5d;--tb:#7fd0e6;--tp:#b7a2ff;--tt:#5eead4;--ts:#a3b8c8;--on:#0a1d2c}
+#tab-tap,#tab-announce{--tone:var(--ta)}#tab-kids{--tone:var(--tt)}#tab-log,#tab-inside{--tone:var(--tb)}#tab-dashboard,#tab-visitors{--tone:var(--tp)}
+#tab-myclass,#mcModal{--tone:var(--tg)}#tab-requests{--tone:var(--tr)}#tab-school,#tab-tv,#tab-staff,#tab-sf2{--tone:var(--ts)}
+.card{border-left:5px solid var(--tone);background:linear-gradient(135deg,color-mix(in srgb,var(--tone) 11%,var(--card)) 0%,var(--card) 72%);box-shadow:0 6px 16px -12px var(--tone)}
+.dbs{border-left:6px solid var(--c,var(--tone));background:linear-gradient(135deg,color-mix(in srgb,var(--c,var(--tone)) 16%,var(--card)) 0%,var(--card) 78%);box-shadow:0 6px 16px -10px var(--c,var(--tone))}
+.dbi{position:relative;overflow:hidden;box-shadow:0 4px 10px -3px var(--c,var(--tone))}.dbi::after{content:"";position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.32),rgba(255,255,255,0) 60%);pointer-events:none}
+.dbbar>div i,.dbcols>div i{position:relative}.dbbar>div i::after,.dbcols>div i::after{content:"";position:absolute;inset:0;border-radius:inherit;background:linear-gradient(180deg,rgba(255,255,255,.35),rgba(255,255,255,0) 70%)}
+#dbOverview{--tone:var(--tp)}#dbArrivals{--tone:var(--tb)}#dbAttn{--tone:var(--tr)}#dbSections{--tone:var(--tg)}#dbRecent{--tone:var(--ta)}
+.stl,.stc{border-left:5px solid var(--tone)}
+.mctile{--c:var(--tone);border-color:color-mix(in srgb,var(--c) 40%,var(--line));background:linear-gradient(135deg,color-mix(in srgb,var(--c) 16%,var(--card)),var(--card))}
+.mctile[data-mcf="in"]{--c:var(--tg)}.mctile[data-mcf="lunch"]{--c:var(--ta)}.mctile[data-mcf="out"]{--c:var(--tb)}.mctile[data-mcf="none"]{--c:var(--tr)}
+.mctile b{color:var(--c)}.mctile[aria-pressed="true"]{background:var(--c);border-color:var(--c);color:var(--on)}.mctile[aria-pressed="true"] b{color:var(--on)}
+@media print{.card,.dbs{background:#fff!important;box-shadow:none!important}}
 </style>
 </head>
 <body>
@@ -1831,7 +1847,7 @@ function renderDashboard(){
     inside=kids.filter(k=>last[k.id]&&AT(last[k.id].type)).length,none=total-present,
     pct=total?Math.round(present/total*100):0;
   $('dbDate').textContent=new Date().toLocaleDateString('en-PH',{weekday:'long',month:'long',day:'numeric'});
-  const card=(c,ic,l,v,sub,g)=>`<div class="dbs"><span class="dbi" style="background:${c}">${dbIc(DBI[ic])}</span><div><small>${l}</small><b>${v}</b><i${g?' class="g"':''}>${sub}</i></div></div>`;
+  const card=(c,ic,l,v,sub,g)=>`<div class="dbs" style="--c:${c}"><span class="dbi" style="background:${c}">${dbIc(DBI[ic])}</span><div><small>${l}</small><b>${v}</b><i${g?' class="g"':''}>${sub}</i></div></div>`;
   $('dbStats').innerHTML=card('#2f7fc1','people','Total students',total,'enrolled')+card('var(--ok)','check','Present today',present,pct+'% of students',1)+card('#1a8fa0','door','Inside now',inside,'in school')+card('#d98e04','clock','Late',late,'after '+t12($('sfCut').value||'07:30'))+card('var(--bad)','x','No tap yet',none,'not arrived');
   // donut
   const seg=(v,off,c)=>v?`<circle cx="21" cy="21" r="15.9155" fill="none" stroke="${c}" stroke-width="5.5" stroke-dasharray="${v/Math.max(total,1)*100} ${100-v/Math.max(total,1)*100}" stroke-dashoffset="${25-off/Math.max(total,1)*100}"/>`:'';
