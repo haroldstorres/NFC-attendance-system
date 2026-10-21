@@ -804,6 +804,34 @@ const RSN={sick:'Sick',family:'Family emergency',weather:'Bad weather',other:'Ot
 const fast=p=>Promise.race([p,new Promise(r=>setTimeout(r,1500))]);
 let myRole='',myName='',mySecs=[],secList=[],kids=[],logs=[],assigning=null,lastTap={},unsub=[],staffList=[];
 const $=id=>document.getElementById(id);
+// --- Confirm and note dialogs that match the app (instead of the browser's own boxes).
+// ask(text,{ok,danger,title}) resolves true/false; askText(title,{ok}) resolves the typed text, or null if cancelled.
+{const st=document.createElement('style');st.textContent='.askdlg{position:fixed;inset:0;z-index:300;display:flex;align-items:center;justify-content:center;padding:12px;background:rgba(5,15,24,.62)}.askbox{width:100%;max-width:420px;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:20px;padding:18px;box-shadow:0 10px 40px rgba(0,0,0,.35)}.askbox h2{margin:0 0 6px;font-size:1.15rem;font-weight:600}.askbox p{margin:0 0 12px;color:var(--mute);white-space:pre-line}.askbox .askrow{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap}.askbox .btn.danger{background:var(--bad);color:#fff}';document.head.appendChild(st)}
+function askDlg(o){return new Promise(res=>{
+  const prev=document.activeElement,el=document.createElement('div'),msg=String(o.message||''),nl=msg.indexOf('\n');
+  let title,body;
+  if(o.input){title=msg.replace(/:\s*$/,'');body=''}
+  else if(o.title){title=o.title;body=msg}
+  else if(nl>0){title=msg.slice(0,nl);body=msg.slice(nl).replace(/^\s+/,'')}
+  else{title='Please confirm';body=msg}
+  el.className='askdlg';
+  el.innerHTML='<div class="askbox" role="alertdialog" aria-modal="true" aria-labelledby="askT"><h2 id="askT"></h2><p id="askM"></p><input id="askI" autocomplete="off" maxlength="300" hidden><div class="askrow"><button type="button" class="btn alt" id="askNo"></button><button type="button" class="btn" id="askYes"></button></div></div>';
+  el.querySelector('#askT').textContent=title;
+  const p=el.querySelector('#askM');p.textContent=body;p.hidden=!body;
+  const inp=el.querySelector('#askI'),no=el.querySelector('#askNo'),yes=el.querySelector('#askYes');
+  inp.hidden=!o.input;no.textContent=o.cancel||'Cancel';yes.textContent=o.ok||(o.input?'Save':'OK');if(o.danger)yes.classList.add('danger');
+  const had=document.body.classList.contains('modal-open');document.body.classList.add('modal-open');
+  const done=v=>{document.removeEventListener('keydown',key,true);el.remove();if(!had)document.body.classList.remove('modal-open');try{prev&&prev.focus&&prev.focus()}catch(e){}res(v)};
+  const ok=()=>done(o.input?inp.value:true),cancel=()=>done(o.input?null:false);
+  function key(e){
+    if(e.key==='Escape'){e.preventDefault();e.stopPropagation();cancel()}
+    else if(e.key==='Enter'&&e.target===inp){e.preventDefault();ok()}
+    else if(e.key==='Tab'){const f=[...el.querySelectorAll('input:not([hidden]),button')],i=f.indexOf(document.activeElement);e.preventDefault();f[(i+(e.shiftKey?-1:1)+f.length)%f.length].focus()}}
+  document.addEventListener('keydown',key,true);
+  el.onclick=e=>{if(e.target===el)cancel()};no.onclick=cancel;yes.onclick=ok;
+  document.body.appendChild(el);(o.input?inp:o.danger?no:yes).focus()})}
+const ask=(message,o={})=>askDlg({message,...o});
+const askText=(message,o={})=>askDlg({message,input:true,...o});
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt=t=>new Date(t).toLocaleTimeString('en-PH',{hour:'numeric',minute:'2-digit'});
 function toast(m){const t=$('toast');t.textContent=m;t.classList.add('on');clearTimeout(toast.h);toast.h=setTimeout(()=>t.classList.remove('on'),2600)}
@@ -1072,7 +1100,7 @@ $('addKid').onclick=async()=>{
      if(!(nk(q[0])===nk(last)&&nk(q[1])===nk(first)&&(!nk(q[2])||!nk(mid)||nk(q[2])===nk(mid))))return false;
      return !(bday&&x.birthdate&&bday!==x.birthdate)});
    if(d){const same=!!(bday&&d.birthdate&&bday===d.birthdate);
-     if(!confirm(d.name+' is already in the list'+(d.section?' ('+d.section+')':'')+(same?', with the same birthdate. This is very likely the same child. ':'. ')+(editing?'Save anyway?':'Add anyway?')))return}}
+     if(!(await ask(d.name+' is already in the list'+(d.section?' ('+d.section+')':'')+(same?', with the same birthdate. This is very likely the same child. ':'. ')+(editing?'Save anyway?':'Add anyway?'),{title:'Possible duplicate',ok:editing?'Save anyway':'Add anyway'})))return}}
   try{
     if(editing){
       const id=editing;
@@ -1118,7 +1146,7 @@ $('kdModal').onclick=e=>{if(e.target===$('kdModal'))closeKd()};
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('kdModal').hidden)closeKd()});
 $('kdCard').onclick=()=>{if(!kdId)return;assigning=kdId;toast('Tap the new card now.');closeKd();render()};
 $('kdEdit').onclick=()=>{const k=kids.find(x=>x.id===kdId);if(!k)return;closeKd();openKid(k)};
-$('kdDel').onclick=()=>{if(!kdId||!confirm('Remove this child?'))return;const id=kdId;closeKd();deleteDoc(doc(db,'kids',id)).catch(()=>toast('Could not remove.'))};
+$('kdDel').onclick=async()=>{if(!kdId||!(await ask('Remove this child?',{title:'Remove child',ok:'Remove',danger:true})))return;const id=kdId;closeKd();deleteDoc(doc(db,'kids',id)).catch(()=>toast('Could not remove.'))};
 
 // Offline banner and the list of taps that are saved on this device but not sent yet.
 function renderOffline(){
@@ -1249,7 +1277,7 @@ $('simGrade').onchange=fillSim;$('simSec').onchange=fillSim;$('simQ').oninput=fi
 $('simClear').onclick=()=>{$('simQ').value='';$('simGrade').value='';$('simSec').value='';fillSim()};
 $('simBtn').onclick=async()=>{
   const k=kids.find(x=>x.id===$('simKid').value);if(!k){toast('Choose a child first.');return}
-  if(!confirm('Record a manual check-in for '+k.name+'?\n\nUse this only when the child does not have the card with them.'))return;
+  if(!(await ask('Record a manual check-in for '+k.name+'?\n\nUse this only when the child does not have the card with them.',{ok:'Record'})))return;
   recordTap(k,true)};
 
 $('csvBtn').onclick=()=>{
@@ -1279,7 +1307,7 @@ function renderSecs(){fillKSec();fillStSec();
   document.querySelectorAll('#secList details').forEach(d=>d.ontoggle=()=>{d.open?secOpen.add(d.dataset.g):secOpen.delete(d.dataset.g)});
   document.querySelectorAll('[data-sx]').forEach(b=>b.onclick=()=>{const x=secList.find(z=>z.id===b.dataset.sx);
     if(kids.some(k=>k.section===x.name)){toast('Move or remove its children first.');return}
-    if(confirm('Remove '+x.name+'?'))deleteDoc(doc(db,'sections',x.id)).catch(()=>toast('Could not remove.'))})}
+    ask('Remove '+x.name+'?',{title:'Remove section',ok:'Remove',danger:true}).then(y=>{if(y)deleteDoc(doc(db,'sections',x.id)).catch(()=>toast('Could not remove.'))})})}
 function openSecAdd(){$('secModal').hidden=false;document.body.classList.add('modal-open');setTimeout(()=>($('mGrade').value?$('mSec'):$('mGrade')).focus(),50)}
 function closeSecAdd(){$('secModal').hidden=true;document.body.classList.remove('modal-open')}
 $('openSec').onclick=openSecAdd;$('secCancel').onclick=closeSecAdd;
@@ -1874,7 +1902,7 @@ function renderStd(){
   $('stdBody').querySelectorAll('[data-sc]').forEach(c=>c.onchange=()=>{const id=c.dataset.sc,v=[...document.querySelectorAll('[data-sc="'+id+'"]:checked')].map(z=>z.value);updateDoc(doc(db,'staff',id),{sections:v}).then(()=>toast('Sections saved'),()=>toast('Could not save.'))});
   $('stdEdit').onclick=()=>{const id=x.id;closeStd();openStEdit(id)};
   $('stdReset').hidden=!x.email;$('stdReset').onclick=()=>sendPasswordResetEmail(auth,x.email).then(()=>toast('Reset email sent.'),()=>toast('Could not send the reset email.'));
-  $('stdRemove').hidden=x.id===me;$('stdRemove').onclick=()=>{if(confirm('Remove this staff member? They will lose access.'))deleteDoc(doc(db,'staff',x.id)).then(closeStd,()=>toast('Could not remove.'))}}
+  $('stdRemove').hidden=x.id===me;$('stdRemove').onclick=()=>{ask('Remove this staff member? They will lose access.',{title:'Remove staff member',ok:'Remove',danger:true}).then(y=>{if(y)deleteDoc(doc(db,'staff',x.id)).then(closeStd,()=>toast('Could not remove.'))})}}
 $('stdClose').onclick=closeStd;
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('stdModal').hidden)closeStd()});
 const STTAB={admin:'Admin',head:'Head',adviser:'Teachers',gate:'Gate',display:'TV'};
@@ -1895,7 +1923,7 @@ function renderStaff(){
   document.querySelectorAll('[data-std]').forEach(b=>b.onclick=()=>openStd(b.dataset.std));
   if(stdOpen&&!$('stdModal').hidden)renderStd();
   document.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>sendPasswordResetEmail(auth,b.dataset.r).then(()=>toast('Reset email sent.'),()=>toast('Could not send the reset email.')));
-  document.querySelectorAll('[data-x]').forEach(b=>b.onclick=()=>{if(confirm('Remove this staff member? They will lose access.'))deleteDoc(doc(db,'staff',b.dataset.x)).catch(()=>toast('Could not remove.'))})}
+  document.querySelectorAll('[data-x]').forEach(b=>b.onclick=()=>{ask('Remove this staff member? They will lose access.',{title:'Remove staff member',ok:'Remove',danger:true}).then(y=>{if(y)deleteDoc(doc(db,'staff',b.dataset.x)).catch(()=>toast('Could not remove.'))})})}
 $('stQ').oninput=()=>renderStaff();
 ['stRole','stGrade','stSec','stGroup'].forEach(i=>$(i).onchange=()=>renderStaff());
 $('stClear').onclick=()=>{$('stQ').value='';$('stRole').value='';$('stGrade').value='';$('stSec').value='';$('stGroup').value='role';renderStaff()};
@@ -1908,7 +1936,7 @@ $('addStaff').onclick=async()=>{
   if(role==='adviser'){const g=$('sGrade').value,sc=$('sSecName').value;
     if(g&&!sc&&secList.some(z=>z.name.startsWith(g+' - '))){toast('Choose the advisory section too.');return}
     const cv=sc?g+' - '+sc:g;sec=cv&&secList.some(z=>z.name===cv)?cv:''}
-  if(role==='admin'&&!confirm('Make '+name+' an ADMIN?\n\nAdmins can control everything in the app: children, attendance, staff, announcements and settings. They can also add or remove other staff.'))return;
+  if(role==='admin'&&!(await ask('Make '+name+' an ADMIN?\n\nAdmins can control everything in the app: children, attendance, staff, announcements and settings. They can also add or remove other staff.',{ok:'Make admin',danger:true})))return;
   try{
     const c=await createUserWithEmailAndPassword(auth2,email,pw);
     await setDoc(doc(db,'staff',c.user.uid),{role,email,name,phone,gender,photo:photos.s,sections:sec?[sec]:[]});
@@ -1929,14 +1957,14 @@ $('openBc').onclick=openBc;$('bcCancel').onclick=closeBc;
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('bcModal').hidden)closeBc()});
 function renderBc(){
   $('bcList').innerHTML=bcList.length?'<strong>Recent broadcasts</strong>'+bcList.map(b=>`<div class="card"><div class="row"><strong>${esc(b.title||'School announcement')}</strong><span class="note">${new Date(b.time).toLocaleString('en-PH',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}</span></div><div class="note">${b.audience==='parents'?'Parents only':b.audience==='tv'?'TV only':'Parents and TV'}${b.tvUntil&&b.audience!=='parents'?' | TV until '+new Date(b.tvUntil).toLocaleString('en-PH',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):''}</div><p style="white-space:pre-wrap;margin:6px 0">${esc(b.body)}</p><button class="btn alt sm" data-bd="${b.id}">Delete</button></div>`).join(''):'';
-  document.querySelectorAll('[data-bd]').forEach(b=>b.onclick=()=>{if(confirm('Delete this broadcast? Parents will no longer see it.'))deleteDoc(doc(db,'broadcasts',b.dataset.bd)).catch(()=>toast('Could not delete.'))})}
+  document.querySelectorAll('[data-bd]').forEach(b=>b.onclick=()=>{ask('Delete this broadcast? Parents will no longer see it.',{title:'Delete broadcast',ok:'Delete',danger:true}).then(y=>{if(y)deleteDoc(doc(db,'broadcasts',b.dataset.bd)).catch(()=>toast('Could not delete.'))})})}
 $('bcSend').onclick=async()=>{
   const title=$('bcTitle').value.trim()||'School announcement',body=$('bcBody').value.trim();
   if(!body){toast('Write a message first.');return}
   const aud=$('bcAud').value,untilV=$('bcUntil').value,until=aud!=='parents'&&untilV?new Date(untilV).getTime():0;
   if(until&&until<=Date.now()){toast('The TV end time must be in the future.');return}
   const who=aud==='parents'?'ALL parents':aud==='tv'?'the TV display':'ALL parents and the TV display';
-  if(!confirm('Send this to '+who+' now?\n\n'+title+'\n'+body))return;
+  if(!(await ask('Send this to '+who+' now?\n\n'+title+'\n'+body,{ok:'Send'})))return;
   $('bcSend').disabled=true;
   try{const data={title,body,time:Date.now(),audience:aud,by:auth.currentUser.uid,byEmail:auth.currentUser.email||''};
     if(until)data.tvUntil=until;
@@ -1957,7 +1985,7 @@ function renderReq(){renderDashboard();
   if(!reqList.length){box.innerHTML=repList.length?'':'<div class="card"><strong>No pending requests</strong><p class="note">Change requests and reports from parents will appear here.</p></div>';return}
   box.innerHTML=`<strong>Change requests from parents (${reqList.length})</strong><p class="note">Make the change with the child's Edit button, then mark the request done.</p>`
    +reqList.map(r=>`<div class="card"><div class="row"><strong>${esc(r.kidName)}</strong><span class="note">${new Date(r.time).toLocaleString('en-PH',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}</span></div><div class="note">${esc(r.section||'No section')} | ${esc(r.parentEmail)}</div><p style="white-space:pre-wrap;margin:6px 0">${esc(r.message)}</p><div class="row"><span><button class="btn sm" data-rd="${r.id}">Mark done</button> <button class="btn alt sm" data-rx="${r.id}">Decline</button></span><button class="btn alt sm" data-ro="${r.kidId}">Open child</button></div></div>`).join('');
-  const resolve=(id,status)=>{const note=prompt(status==='done'?'Optional note for the parent:':'Reason for declining (the parent will see this):','');if(note===null)return;
+  const resolve=async(id,status)=>{const note=await askText(status==='done'?'Optional note for the parent:':'Reason for declining (the parent will see this):',{ok:status==='done'?'Mark done':'Decline'});if(note===null)return;
     updateDoc(doc(db,'changeRequests',id),{status,note:note.trim().slice(0,300),resolvedBy:auth.currentUser.uid,resolvedTime:Date.now()}).catch(()=>toast('Could not update the request.'))};
   box.querySelectorAll('[data-rd]').forEach(b=>b.onclick=()=>resolve(b.dataset.rd,'done'));
   box.querySelectorAll('[data-rx]').forEach(b=>b.onclick=()=>resolve(b.dataset.rx,'declined'));
@@ -1970,7 +1998,7 @@ function renderReports(){
   const when=t=>new Date(t).toLocaleString('en-PH',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
   box.innerHTML=`<strong>Parent reports: child not at school (${repList.length})</strong><p class="note">A parent says the child is not at school, but an arrival was recorded. Check the child in person, then close the report.</p>`
    +repList.map(r=>`<div class="card"><div class="row"><div class="who" style="align-items:center">${av(kids.find(k=>k.id===r.kidId)||{name:r.kidName},true)}<strong>${esc(r.kidName)}</strong></div><span class="note">${when(r.time)}</span></div><div class="note">${esc(r.section||'No section')} | ${esc(r.parentEmail)}</div><div class="note">Arrival recorded at ${fmt(r.tapTime)}</div>${r.message?`<p style="white-space:pre-wrap;margin:6px 0">${esc(r.message)}</p>`:''}<div class="row"><span><button class="btn sm" data-pa="${r.id}">Child is at school</button> <button class="btn alt sm" data-pn="${r.id}">Child is not at school</button></span><button class="btn alt sm" data-pk="${r.kidId}">Open child</button></div></div>`).join('');
-  const close=(id,status)=>{const note=prompt(status==='at_school'?'Optional note for the parent:':'What is the school doing about it? (the parent will see this)','');if(note===null)return;
+  const close=async(id,status)=>{const note=await askText(status==='at_school'?'Optional note for the parent:':'What is the school doing about it? (the parent will see this)',{ok:'Close report'});if(note===null)return;
     updateDoc(doc(db,'childReports',id),{status,note:note.trim().slice(0,300),resolvedBy:auth.currentUser.uid,resolvedTime:Date.now()}).catch(()=>toast('Could not update the report.'))};
   box.querySelectorAll('[data-pa]').forEach(b=>b.onclick=()=>close(b.dataset.pa,'at_school'));
   box.querySelectorAll('[data-pn]').forEach(b=>b.onclick=()=>close(b.dataset.pn,'not_at_school'));
