@@ -302,7 +302,9 @@ function showBrand(d){if(d.lateAfter)lateAfter=d.lateAfter;const n=(d.schoolName
   const im=$('schLogo');im.hidden=!l;if(l)im.src=l;$('schName').textContent=t;$('schName').hidden=!t;
   try{localStorage.setItem('tapin-brand',JSON.stringify({schoolName:n,schoolYear:y,schoolLogo:l,lateAfter}))}catch(e){}}
 try{const b=JSON.parse(localStorage.getItem('tapin-brand')||'null');if(b)showBrand(b)}catch(e){}
-function start(user){$('pwBtn').hidden=false;
+function goTabParam(){const t=new URLSearchParams(location.search).get('tab');if(['att','ann','rep'].includes(t))setTab(t)}
+if('serviceWorker' in navigator)navigator.serviceWorker.addEventListener('message',e=>{const t=e.data&&e.data.tab;if(['att','ann','rep'].includes(t)){closeAnn();setTab(t);window.scrollTo(0,0)}});
+function start(user){$('pwBtn').hidden=false;goTabParam();
   $('who').textContent='Signed in as '+user.email;
   $('verify').hidden=true;$('app').hidden=false;
   unsub=onSnapshot(query(collection(db,'log'),where('parentEmails','array-contains',user.email.toLowerCase())),
@@ -349,7 +351,7 @@ $('pushBox').onchange=e=>{const k=e.target.dataset&&e.target.dataset.pp;if(!k)re
 $('pushBox').onclick=async e=>{if(e.target.id!=='pushOn')return;try{await Notification.requestPermission()}catch(_){}await savePush();renderPush();setAlertBox()};
 function notify(b){
   if(!('Notification' in window)||Notification.permission!=='granted'||!navigator.serviceWorker)return;
-  navigator.serviceWorker.ready.then(r=>r.showNotification(b.title||'School announcement',{body:b.body,icon:'icon-192.png',badge:'icon-192.png',tag:'tapin-'+b.id})).catch(()=>{})}
+  navigator.serviceWorker.ready.then(r=>r.showNotification(b.title||'School announcement',{body:b.body,icon:'icon-192.png',badge:'icon-192.png',tag:'tapin-'+b.id,data:{tab:'ann'}})).catch(()=>{})}
 function renderAnn(items){
   annItems=items;
   const newest=items.length?items[0].time:0;
@@ -359,8 +361,18 @@ function renderAnn(items){
   if(!shown.length){$('annBadge').hidden=true;$('ann').innerHTML='<div class="card"><strong>No announcements</strong><p class="note">Notices from the school in the last 14 days appear here.</p></div>';return}
   const unread=shown.some(b=>b.time>seen),nUn=shown.filter(b=>b.time>seen).length;$('annBadge').hidden=!nUn;$('annBadge').textContent=nUn;
   $('ann').innerHTML='<div class="row"><strong>From the school</strong>'+(unread?'<button class="btn alt sm" id="annRead">Mark as read</button>':'')+'</div>'
-    +shown.map(b=>`<div class="card ann ${b.time>seen?'new':''}"><div class="row"><span class="big">${esc(b.title||'School announcement')}</span>${b.time>seen?'<span class="pill in">New</span>':''}</div><div class="note">${esc(fdt(b.time))}</div><p>${esc(b.body)}</p></div>`).join('');
-  const rb=$('annRead');if(rb)rb.onclick=()=>{setSeen(newest);renderAnn(annItems)}}
+    +shown.map(b=>`<div class="card ann ${b.time>seen?'new':''}" role="button" tabindex="0" data-ann="${esc(b.id)}" style="cursor:pointer"><div class="row"><span class="big">${esc(b.title||'School announcement')}</span>${b.time>seen?'<span class="pill in">New</span>':''}</div><div class="note">${esc(fdt(b.time))}</div><p>${esc(b.body)}</p></div>`).join('');
+  const rb=$('annRead');if(rb)rb.onclick=e=>{e.stopPropagation();setSeen(newest);renderAnn(annItems)}
+  document.querySelectorAll('[data-ann]').forEach(c=>{c.onclick=()=>openAnn(c.dataset.ann);c.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openAnn(c.dataset.ann)}}})}
+// Tap an announcement to read the whole message.
+function openAnn(id){
+  const b=annItems.find(x=>x.id===id);if(!b)return;
+  closeAnn();const el=document.createElement('div');el.id='amodal';el.className='mo';
+  el.innerHTML=`<div class="ms" role="dialog" aria-modal="true" aria-labelledby="aTitle"><div class="row"><span class="big" id="aTitle">${esc(b.title||'School announcement')}</span><button class="btn alt sm" type="button" data-aclose aria-label="Close">Close</button></div><div class="note">${esc(fdt(b.time))}</div><p style="white-space:pre-wrap;margin:10px 0 0">${esc(b.body)}</p></div>`;
+  el.onclick=e=>{if(e.target.id==='amodal'||e.target.closest('[data-aclose]'))closeAnn()};
+  document.body.appendChild(el);document.body.style.overflow='hidden';const c=el.querySelector('[data-aclose]');if(c)c.focus()}
+function closeAnn(){const el=$('amodal');if(el)el.remove();if(!mKid)document.body.style.overflow=''}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeAnn()});
 
 const ICON={check:'<path d="M5 12.5l4.5 4.5L19 7.5"/>',x:'<path d="M6 6l12 12M18 6L6 18"/>',clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',cal:'<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/>',home:'<path d="M4 11l8-7 8 7"/><path d="M6 10v9h12v-9"/>',dash:'<path d="M7 12h10"/>'};
 const ic=n=>`<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[n]}</svg>`;
