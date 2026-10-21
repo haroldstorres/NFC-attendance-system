@@ -421,22 +421,20 @@ body.is-login #toast{background:#fff;color:#16323a;box-shadow:0 6px 20px rgba(0,
 .vwrap{overflow-x:auto}
 .vt{width:100%;border-collapse:collapse;font-size:.9rem}.vt th,.vt td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top}.vt th{color:var(--mute);font-weight:600;white-space:nowrap}.vt td.t{white-space:nowrap}
 .vcard{display:flex;gap:8px;align-items:center;justify-content:space-between;margin-top:8px;flex-wrap:wrap}
-/* Colorful cards: every tab has a tone; status colors (present, late, absent) stay the same everywhere */
-:root{--tg:#17784d;--ta:#9a5f00;--tr:#c2410c;--tb:#0b5f8a;--tp:#6b4fd1;--tt:#0f766e;--ts:#475569;--on:#fff;--tone:var(--tt)}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--tg:#4cc790;--ta:#f2b233;--tr:#f08a5d;--tb:#7fd0e6;--tp:#b7a2ff;--tt:#5eead4;--ts:#a3b8c8;--on:#0a1d2c}}
-:root[data-theme="dark"]{--tg:#4cc790;--ta:#f2b233;--tr:#f08a5d;--tb:#7fd0e6;--tp:#b7a2ff;--tt:#5eead4;--ts:#a3b8c8;--on:#0a1d2c}
-#tab-tap,#tab-announce{--tone:var(--ta)}#tab-kids{--tone:var(--tt)}#tab-log,#tab-inside{--tone:var(--tb)}#tab-dashboard,#tab-visitors{--tone:var(--tp)}
-#tab-myclass,#mcModal{--tone:var(--tg)}#tab-requests{--tone:var(--tr)}#tab-school,#tab-tv,#tab-staff,#tab-sf2{--tone:var(--ts)}
-.card{border-left:5px solid var(--tone);background:linear-gradient(135deg,color-mix(in srgb,var(--tone) 11%,var(--card)) 0%,var(--card) 72%);box-shadow:0 6px 16px -12px var(--tone)}
-.dbs{border-left:6px solid var(--c,var(--tone));background:linear-gradient(135deg,color-mix(in srgb,var(--c,var(--tone)) 16%,var(--card)) 0%,var(--card) 78%);box-shadow:0 6px 16px -10px var(--c,var(--tone))}
-.dbi{position:relative;overflow:hidden;box-shadow:0 4px 10px -3px var(--c,var(--tone))}.dbi::after{content:"";position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.32),rgba(255,255,255,0) 60%);pointer-events:none}
-.dbbar>div i,.dbcols>div i{position:relative}.dbbar>div i::after,.dbcols>div i::after{content:"";position:absolute;inset:0;border-radius:inherit;background:linear-gradient(180deg,rgba(255,255,255,.35),rgba(255,255,255,0) 70%)}
-#dbOverview{--tone:var(--tp)}#dbArrivals{--tone:var(--tb)}#dbAttn{--tone:var(--tr)}#dbSections{--tone:var(--tg)}#dbRecent{--tone:var(--ta)}
-.stl,.stc{border-left:5px solid var(--tone)}
-.mctile{--c:var(--tone);border-color:color-mix(in srgb,var(--c) 40%,var(--line));background:linear-gradient(135deg,color-mix(in srgb,var(--c) 16%,var(--card)),var(--card))}
-.mctile[data-mcf="in"]{--c:var(--tg)}.mctile[data-mcf="lunch"]{--c:var(--ta)}.mctile[data-mcf="out"]{--c:var(--tb)}.mctile[data-mcf="none"]{--c:var(--tr)}
-.mctile b{color:var(--c)}.mctile[aria-pressed="true"]{background:var(--c);border-color:var(--c);color:var(--on)}.mctile[aria-pressed="true"] b{color:var(--on)}
-@media print{.card,.dbs{background:#fff!important;box-shadow:none!important}}
+
+/* Hue colour system (one --h per item, same idea as the RPT Counter). Light and dark. */
+:root{--hx-tx:24%;--hx-tint:.16;--hx-bd:.35;--hx-bl:42%}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--hx-tx:80%;--hx-tint:.24;--hx-bd:.5;--hx-bl:56%}}
+:root[data-theme="dark"]{--hx-tx:80%;--hx-tint:.24;--hx-bd:.5;--hx-bl:56%}
+.stl[style*="--h:"],.stc[style*="--h:"],.dbs[style*="--h:"],.card[style*="--h:"]{border-left:4px solid hsl(var(--h) 70% 50%);background:linear-gradient(135deg,hsl(var(--h) 80% 50%/var(--hx-tint)),transparent 70%),var(--card)}
+.lgstats .dbs[style*="--h:"]{border-left:5px solid hsl(var(--h) 70% 50%)}
+.dbs[style*="--h:"] .dbi{background:linear-gradient(135deg,hsl(var(--h) 70% 34%),hsl(calc(var(--h) + 30) 70% 26%))}
+.av[style*="--h:"]{background:linear-gradient(135deg,hsl(var(--h) 60% 28%),hsl(calc(var(--h) + 30) 60% 22%));color:#fff}
+.tag.ok,.tag.no,.dbchip{background:hsl(var(--h) 80% 50%/var(--hx-tint));color:hsl(var(--h) 70% var(--hx-tx));border:1px solid hsl(var(--h) 70% 50%/var(--hx-bd));font-weight:600}
+.tag.ok{--h:150}.tag.no{--h:5}
+.dbchip,.dbchip.in,.dbchip.back{--h:150}.dbchip.out{--h:35}.dbchip.lunch{--h:265}
+.kcard[style*="--h:"]{background:linear-gradient(135deg,hsl(var(--h) 60% 28%),hsl(calc(var(--h) + 30) 60% 22%))}
+.kcard[style*="--h:"] .kc-ini{color:rgba(255,255,255,.8)}
 </style>
 </head>
 <body>
@@ -1007,8 +1005,9 @@ function showResult(k,e){
 // --- photos: resized to a small square JPEG and saved inside the record (no extra storage service needed)
 const photos={k:'',s:'',se:'',v:''};
 function initials(n){const a=splitName(n);return ((a[1]||'')[0]||'')+((a[0]||'')[0]||'')||'?'}
+const hue=s=>{let h=0;for(const c of String(s||''))h=(h*31+c.charCodeAt(0))%360;return h},TH={in:150,back:150,out:35,lunch:265},RH={admin:265,adviser:215};
 function av(x,big){const src=x&&x.photo,cls='av'+(big?' lg':'');
-  return src&&/^data:image\/(jpeg|png|webp);base64,/.test(src)?`<img class="${cls}" alt="" src="${src}">`:`<span class="${cls}" aria-hidden="true">${esc(initials(x&&(x.name||x.email)).toUpperCase())}</span>`}
+  return src&&/^data:image\/(jpeg|png|webp);base64,/.test(src)?`<img class="${cls}" alt="" src="${src}">`:`<span class="${cls}" style="--h:${hue(x&&(x.section||x.name||x.email))}" aria-hidden="true">${esc(initials(x&&(x.name||x.email)).toUpperCase())}</span>`}
 function setPhoto(p,d){photos[p]=d||'';const pv=$(p+'PhotoPrev');
   pv.innerHTML=d?`<img class="av lg" alt="Photo" src="${d}" style="width:100%;height:100%">`:'📷';$(p+'PhotoDel').hidden=!d;$(p+'PhotoBtn').textContent=d?'Change photo':'Upload photo'}
 function fileToPhoto(file){return new Promise((res,rej)=>{const url=URL.createObjectURL(file),img=new Image();
@@ -1163,7 +1162,7 @@ let kdId=null;
 const okPhoto=x=>/^data:image\/(jpeg|png|webp);base64,/.test(x||'');
 function kTile(k){
   const st=assigning===k.id?'<span class="kc-st wait">Waiting for a tap...</span>':k.uid?'<span class="kc-st ok">Has card</span>':'<span class="kc-st no">No card</span>';
-  return `<button type="button" class="kcard" data-k="${k.id}" aria-label="${esc(k.name)}. Open details">${okPhoto(k.photo)?`<img src="${k.photo}" alt="" loading="lazy">`:`<span class="kc-ini" aria-hidden="true">${esc(initials(k.name).toUpperCase())}</span>`}${st}<span class="kc-info"><strong>${esc(k.name)}</strong><span>${esc(k.section||'No section')}</span></span></button>`}
+  return `<button type="button" class="kcard" style="--h:${hue(k.section||k.name)}" data-k="${k.id}" aria-label="${esc(k.name)}. Open details">${okPhoto(k.photo)?`<img src="${k.photo}" alt="" loading="lazy">`:`<span class="kc-ini" aria-hidden="true">${esc(initials(k.name).toUpperCase())}</span>`}${st}<span class="kc-info"><strong>${esc(k.name)}</strong><span>${esc(k.section||'No section')}</span></span></button>`}
 function fillKd(k){
   $('kdPhoto').innerHTML=okPhoto(k.photo)?`<img src="${k.photo}" alt="Photo of ${esc(k.name)}">`:`<span class="kc-ini" aria-hidden="true">${esc(initials(k.name).toUpperCase())}</span>`;
   $('kdName').textContent=k.name;
@@ -1240,8 +1239,8 @@ function renderLogTab(){
   // summary: where each child stands after their last tap of the day
   const cnt={in:0,lunch:0,out:0};Object.values(last).forEach(l=>{if(AT(l.type))cnt.in++;else if(l.type==='lunch')cnt.lunch++;else cnt.out++});
   const none=Math.max(0,kids.length-kids.filter(k=>last[k.id]).length);
-  const tile=(lbl,n,c)=>`<div class="dbs" style="--c:${c}"><div><small>${lbl}</small><b>${n}</b></div></div>`;
-  $('logStats').innerHTML=tile('Inside',cnt.in,'var(--ok)')+tile('Out for lunch',cnt.lunch,'#b0391b')+tile('Went home',cnt.out,'#96600a')+tile(isToday?'Not yet in':'No tap',none,'var(--mute)');
+  const tile=(lbl,n,c)=>`<div class="dbs" style="${typeof c==='number'?'--h:'+c:'--c:'+c}"><div><small>${lbl}</small><b>${n}</b></div></div>`;
+  $('logStats').innerHTML=tile('Inside',cnt.in,150)+tile('Out for lunch',cnt.lunch,265)+tile('Went home',cnt.out,35)+tile(isToday?'Not yet in':'No tap',none,'var(--mute)');
   const num=new Map(all.map((l,i)=>[l.id,all.length-i]));
   logState={t,all,num,flags,msg:all.length?'No taps match your filters.':(isToday?'No taps yet today.':'No taps were recorded on this day.')};renderLogList()}
 async function setLogDay(v){
@@ -1284,7 +1283,7 @@ function renderInside(){
   const inside=kids.filter(k=>last[k.id]&&AT(last[k.id].type)).sort(byName),away=kids.filter(k=>last[k.id]&&last[k.id].type==='lunch').sort(byName);
   const dt=$('sfDismiss').value,now=new Date(),due=!!dt&&now.getHours()*60+now.getMinutes()>=toMin(dt),n=inside.length;
   const row=k=>{const l=last[k.id],ph=k.phone?`<a class="btn alt sm" href="tel:${esc(k.phone)}">Call</a>`:'';
-    return `<div class="card row"><div class="who" style="align-items:center">${av(k)}<strong>${esc(k.name)}</strong></div><span style="display:flex;gap:8px;align-items:center"><span class="tag ${AT(l.type)?'ok':''}">${tl(l.type)} ${fmt(l.time)}</span>${ph}</span></div>`};
+    return `<div class="card row" style="--h:${TH[l.type]||35}"><div class="who" style="align-items:center">${av(k)}<strong>${esc(k.name)}</strong></div><span style="display:flex;gap:8px;align-items:center"><span class="tag ${AT(l.type)?'ok':''}">${tl(l.type)} ${fmt(l.time)}</span>${ph}</span></div>`};
   const groups=ks=>{const g={};ks.forEach(k=>(g[k.section||'No section']=g[k.section||'No section']||[]).push(k));
     return Object.keys(g).sort(cmp).map(sec=>`<div class="ihd">${esc(sec)} (${g[sec].length})</div>`+g[sec].map(row).join('')).join('')};
   const w=$('inWarn');
@@ -1847,8 +1846,8 @@ function renderDashboard(){
     inside=kids.filter(k=>last[k.id]&&AT(last[k.id].type)).length,none=total-present,
     pct=total?Math.round(present/total*100):0;
   $('dbDate').textContent=new Date().toLocaleDateString('en-PH',{weekday:'long',month:'long',day:'numeric'});
-  const card=(c,ic,l,v,sub,g)=>`<div class="dbs" style="--c:${c}"><span class="dbi" style="background:${c}">${dbIc(DBI[ic])}</span><div><small>${l}</small><b>${v}</b><i${g?' class="g"':''}>${sub}</i></div></div>`;
-  $('dbStats').innerHTML=card('#2f7fc1','people','Total students',total,'enrolled')+card('var(--ok)','check','Present today',present,pct+'% of students',1)+card('#1a8fa0','door','Inside now',inside,'in school')+card('#d98e04','clock','Late',late,'after '+t12($('sfCut').value||'07:30'))+card('var(--bad)','x','No tap yet',none,'not arrived');
+  const card=(c,ic,l,v,sub,g)=>`<div class="dbs" style="--h:${c}"><span class="dbi">${dbIc(DBI[ic])}</span><div><small>${l}</small><b>${v}</b><i${g?' class="g"':''}>${sub}</i></div></div>`;
+  $('dbStats').innerHTML=card(215,'people','Total students',total,'enrolled')+card(150,'check','Present today',present,pct+'% of students',1)+card(185,'door','Inside now',inside,'in school')+card(35,'clock','Late',late,'after '+t12($('sfCut').value||'07:30'))+card(5,'x','No tap yet',none,'not arrived');
   // donut
   const seg=(v,off,c)=>v?`<circle cx="21" cy="21" r="15.9155" fill="none" stroke="${c}" stroke-width="5.5" stroke-dasharray="${v/Math.max(total,1)*100} ${100-v/Math.max(total,1)*100}" stroke-dashoffset="${25-off/Math.max(total,1)*100}"/>`:'';
   $('dbOverview').innerHTML=`<div class="dbh">Today's attendance</div><div class="dbdon"><svg viewBox="0 0 42 42" role="img" aria-label="${pct}% present"><circle cx="21" cy="21" r="15.9155" fill="none" stroke="var(--line)" stroke-width="5.5"/>${seg(onTime,0,'var(--ok)')}${seg(late,onTime,'#d98e04')}<text x="21" y="22.5" text-anchor="middle" font-size="8" font-weight="600" fill="currentColor">${pct}%</text></svg>
@@ -1861,12 +1860,12 @@ function renderDashboard(){
   let ah='<p class="note">No arrivals yet today.</p>';
   if(arr.length){let a=Math.min(...arr),b=Math.max(...arr);if((b-a)/30>13)a=b-13*30;const cnt={};arr.forEach(m=>{const k=Math.max(m,a);cnt[k]=(cnt[k]||0)+1});
     const bk=[];for(let m=a;m<=b;m+=30)bk.push(m);const mx=Math.max(...bk.map(m=>cnt[m]||0),1),lb=m=>{const h=Math.floor(m/60);return (h%12||12)+':'+String(m%60).padStart(2,'0')};
-    ah=`<div class="dbcols">${bk.map(m=>`<div><b>${cnt[m]||0}</b><i style="height:${Math.max((cnt[m]||0)/mx*100,2)}%;background:${m>=cut?'#d98e04':'var(--link)'}"></i><span>${lb(m)}</span></div>`).join('')}</div><p class="note" style="margin:8px 0 0">First tap of the day, every 30 minutes. Amber bars are after the late time.</p>`}
+    ah=`<div class="dbcols">${bk.map((m,i)=>`<div><b>${cnt[m]||0}</b><i style="height:${Math.max((cnt[m]||0)/mx*100,2)}%;background:${m>=cut?'#d98e04':`hsl(${175+i*8} 65% var(--hx-bl))`}"></i><span>${lb(m)}</span></div>`).join('')}</div><p class="note" style="margin:8px 0 0">First tap of the day, every 30 minutes. Amber bars are after the late time.</p>`}
   $('dbArrivals').innerHTML=`<div class="dbh">Arrivals by time</div>`+ah;
   // sections
   const secs=[...new Set(kids.map(k=>k.section).filter(Boolean))].sort(cmp),
     bars=secs.map(n=>{const ks=kids.filter(k=>k.section===n),pr=ks.filter(k=>first[k.id]).length,p=ks.length?Math.round(pr/ks.length*100):0;
-      return `<div class="dbbar" title="${esc(n)}: ${pr} of ${ks.length}"><span>${esc(n)}</span><div><i style="width:${p}%;background:${p>=85?'var(--ok)':p>=70?'#d98e04':'var(--bad)'}"></i></div><span>${p}%</span></div>`}).join('');
+      return `<div class="dbbar" title="${esc(n)}: ${pr} of ${ks.length}"><span>${esc(n)}</span><div><i style="width:${p}%;background:${p<70?'var(--bad)':`linear-gradient(90deg,hsl(${hue(n)} 65% var(--hx-bl)),hsl(${(hue(n)+30)%360} 65% var(--hx-bl))`+')'}"></i></div><span>${p}%</span></div>`}).join('');
   $('dbSections').innerHTML=`<div class="dbh">Attendance by section</div>`+(bars||'<p class="note">No sections yet.</p>');
   // needs attention
   const dt=$('sfDismiss').value,due=!!dt&&new Date().getHours()*60+new Date().getMinutes()>=toMin(dt),nc=kids.filter(k=>!k.uid).length,items=[];
@@ -1923,7 +1922,7 @@ function renderMyClass(){
     .map(t=>`<button type="button" class="mctile" data-mcf="${t[0]}" aria-pressed="${t[0]===mcFilter}"><b>${t[2]}</b>${t[1]}</button>`).join('');
   const q=$('mcQ').value,list=ks.filter(k=>(mcFilter==='all'||st(k)===mcFilter)&&qMatch(k.name,q));
   const tag=k=>{const l=last[k.id],s=st(k);return s==='none'?'<span class="tag no">No tap yet</span>':`<span class="tag ${s==='in'?'ok':''}">${s==='in'?'Inside':s==='lunch'?'Lunch':'Left'} ${fmt(l.time)}</span>`};
-  $('mcList').innerHTML=ks.length?(list.length?list.map(k=>`<button type="button" class="stl" data-mck="${k.id}">${av(k)}<span class="meta"><strong>${esc(k.name)}</strong><small>${esc(k.parent||(k.sex==='M'?'Male':k.sex==='F'?'Female':''))}</small></span>${tag(k)}</button>`).join(''):'<p class="note">No students match.</p>'):'<p class="note">No students in this section yet.</p>';
+  $('mcList').innerHTML=ks.length?(list.length?list.map(k=>`<button type="button" class="stl" style="--h:${hue(k.section||k.name)}" data-mck="${k.id}">${av(k)}<span class="meta"><strong>${esc(k.name)}</strong><small>${esc(k.parent||(k.sex==='M'?'Male':k.sex==='F'?'Female':''))}</small></span>${tag(k)}</button>`).join(''):'<p class="note">No students match.</p>'):'<p class="note">No students in this section yet.</p>';
   // Not arrived yet (only after the late time) and late today, with a button to notify the parents.
   {const nowD=new Date(),cutM=toMin($('sfCut').value||'07:30'),pastCut=nowD.getHours()*60+nowD.getMinutes()>cutM,ds=dayStr(),
     sent=k=>alertSent.has(k.id+'_'+ds+'_absent'),
@@ -1934,7 +1933,7 @@ function renderMyClass(){
     let h='';
     if(miss.length)h+=`<div class="warn"><div class="row"><strong>Not arrived yet (${miss.length})</strong>${todo.length?`<button type="button" class="btn sm" id="mcNotifyAll">Notify all (${todo.length})</button>`:''}</div>`
       +miss.map(k=>{const a=adjToday(k.id),em=emailsOf(k).length,info=a?'Excused: '+(RSN[a.reason]||'Absent'):noteOf(k.id)?'Parent says: '+(RSN[noteOf(k.id).reason]||'Absent'):sent(k)?'Parent notified':em?'No tap yet':'No parent email';
-        return `<div class="row" style="padding:8px 0;border-top:1px solid var(--line);flex-wrap:nowrap"><button type="button" class="stl" data-mck="${k.id}" style="flex:1;min-width:0">${av(k)}<span class="meta"><strong>${esc(k.name)}</strong><small>${esc(info)}</small></span></button>${a||sent(k)||!em||noteOf(k.id)?'':`<button type="button" class="btn alt sm" data-mcn="${k.id}" aria-label="Notify the parent of ${esc(k.name)}">Notify</button>`}</div>`}).join('')+'</div>';
+        return `<div class="row" style="padding:8px 0;border-top:1px solid var(--line);flex-wrap:nowrap"><button type="button" class="stl" data-mck="${k.id}" style="--h:${hue(k.section||k.name)};flex:1;min-width:0">${av(k)}<span class="meta"><strong>${esc(k.name)}</strong><small>${esc(info)}</small></span></button>${a||sent(k)||!em||noteOf(k.id)?'':`<button type="button" class="btn alt sm" data-mcn="${k.id}" aria-label="Notify the parent of ${esc(k.name)}">Notify</button>`}</div>`}).join('')+'</div>';
     {const pn=ks.map(k=>({k,n:noteOf(k.id)})).filter(x=>x.n&&!adjToday(x.k.id));
       if(pn.length)h+=`<div class="card"><strong>Parent absence notes (${pn.length})</strong>${pn.map(x=>`<div class="row" style="padding:8px 0;border-top:1px solid var(--line);flex-wrap:nowrap"><span style="flex:1;min-width:0"><strong>${esc(x.k.name)}</strong><br><small class="note">${esc(RSN[x.n.reason]||'Absent')}${x.n.message?' - '+esc(x.n.message):''}</small></span><button type="button" class="btn sm" data-mcx="${x.k.id}">Excuse</button></div>`).join('')}</div>`}
     if(lateL.length)h+=`<div class="card"><strong>Late today (${lateL.length})</strong>${lateL.map(k=>`<div class="row" style="padding:6px 0;border-top:1px solid var(--line)"><span>${esc(k.name)}</span><span class="note">${fmt(fin[k.id].time)}</span></div>`).join('')}</div>`;
@@ -1985,8 +1984,8 @@ function stRows(sv,staffCard){
   const one=$('stRole').value&&$('stGroup').value==='role';
   const sub=x=>x.role==='adviser'?stSummary(x):(x.name?x.email||'':''),nm=x=>x.name||x.email||x.id,
     item=x=>stView==='card'
-    ?`<button type="button" class="stc" data-std="${x.id}">${av(x,true)}<strong>${esc(nm(x))}</strong><small>${esc(sub(x))}</small><span class="tag ${x.role==='admin'?'ok':''}">${x.role==='adviser'?stTotal(x)+' students':esc(stRoleName(stRoleOf(x)))}</span></button>`
-    :`<button type="button" class="stl" data-std="${x.id}">${av(x)}<span class="meta"><strong>${esc(nm(x))}</strong><small>${esc(sub(x))}</small></span>${x.role==='adviser'?`<span class="cnt"><b>${stTotal(x)}</b><small>students</small></span>`:`<span class="tag ${x.role==='admin'?'ok':''}">${esc(stRoleName(stRoleOf(x)))}</span>`}</button>`;
+    ?`<button type="button" class="stc" style="--h:${RH[x.role]||hue(x.role||x.name)}" data-std="${x.id}">${av(x,true)}<strong>${esc(nm(x))}</strong><small>${esc(sub(x))}</small><span class="tag ${x.role==='admin'?'ok':''}">${x.role==='adviser'?stTotal(x)+' students':esc(stRoleName(stRoleOf(x)))}</span></button>`
+    :`<button type="button" class="stl" style="--h:${RH[x.role]||hue(x.role||x.name)}" data-std="${x.id}">${av(x)}<span class="meta"><strong>${esc(nm(x))}</strong><small>${esc(sub(x))}</small></span>${x.role==='adviser'?`<span class="cnt"><b>${stTotal(x)}</b><small>students</small></span>`:`<span class="tag ${x.role==='admin'?'ok':''}">${esc(stRoleName(stRoleOf(x)))}</span>`}</button>`;
   return sv.filter(x=>!(one&&x._h)).map(x=>x._h?`<div class="day">${esc(x._h)}</div>`:item(x)).join('')}
 document.querySelectorAll('[data-stv]').forEach(b=>b.onclick=()=>{stView=b.dataset.stv;try{localStorage.setItem('stView',stView)}catch(e){}renderStaff()});
 function openStd(id){stdOpen=id;stdEditOpen=false;renderStd();$('stdModal').hidden=false;document.body.classList.add('modal-open');$('stdModal').firstElementChild.scrollTop=0}
