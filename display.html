@@ -139,11 +139,12 @@ html[data-theme="light"] .n1 .sccls{color:#35466b}
 .tools button.ico{display:inline-grid;place-items:center;padding:.8vh .9vw}
 .tools button.ico svg{width:2.4vh;height:2.4vh}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
-/* Colorful cards */
-.stat{background:linear-gradient(135deg,color-mix(in srgb,var(--c) 34%,rgba(255,255,255,.04)) 0%,rgba(255,255,255,.07) 70%);box-shadow:0 .8vh 2.4vh -1.4vh var(--c)}
-.card{background:linear-gradient(180deg,#fff 0%,#fff 55%,color-mix(in srgb,var(--c) 16%,#fff) 100%);box-shadow:inset 0 .7vh 0 var(--c),0 1vh 3vh rgba(0,0,0,.35)}
-.card.latest{box-shadow:inset 0 .7vh 0 var(--c),0 0 5vh var(--c),0 1vh 3vh rgba(0,0,0,.35)}
-.chip{background:linear-gradient(135deg,var(--c),var(--cd))}
+
+/* Hue colours: same section name = same colour in every Tap-In app. Dark is the default, light follows the toggle. */
+.ini[style*="--h:"]{background:linear-gradient(135deg,hsl(var(--h) 60% 34%),hsl(calc(var(--h) + 30) 60% 24%))}
+.cls[style*="--h:"] b{color:hsl(var(--h) 70% 30%)}
+.stat{background:linear-gradient(135deg,color-mix(in srgb,var(--c) 30%,transparent),rgba(255,255,255,.06) 70%)}
+html[data-theme="light"] .stat{background:linear-gradient(135deg,color-mix(in srgb,var(--c) 16%,transparent),transparent 70%),#fff}
 </style>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600&display=swap" rel="stylesheet">
 </head>
@@ -215,6 +216,7 @@ const firebaseConfig={
 const app=initializeApp(firebaseConfig,'tvdisplay'),auth=getAuth(app),db=getFirestore(app);
 
 const $=id=>document.getElementById(id);
+const hue=s=>{let h=0;for(const c of String(s||''))h=(h*31+c.charCodeAt(0))%360;return h};
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const SLOTS=10, ANNOUNCE_DAYS=7;
 const TYPES={in:['Entry','in'],out:['Exit','out'],lunch:['Lunch','lunch'],back:['Back','back']};
@@ -265,7 +267,7 @@ function renderList(grid){
   if(!rows.length){grid.className='';grid.innerHTML='<div class="empty">Tap your card to check in<small>Arrivals and departures will show here</small></div>';return}
   grid.innerHTML=rows.map((t,i)=>{
     const ty=TYPES[t.type]||TYPES.out,k=kidCache.get(t.kidId)||{};
-    const photo=school.mode!=='initials'&&okPhoto(k.photo)?`<img src="${k.photo}" alt="">`:`<div class="ini">${esc(iniOf(t.name))}</div>`;
+    const photo=school.mode!=='initials'&&okPhoto(k.photo)?`<img src="${k.photo}" alt="">`:`<div class="ini" style="--h:${hue(k.section||t.section||t.name)}">${esc(iniOf(t.name))}</div>`;
     return `<div class="row ${ty[1]}${i===0?' latest':''}" data-id="${esc(t.id)}"><div class="rph">${photo}</div><div class="rn">${esc(shownName(t.name))}</div><div class="rs"><b>${LBL[t.type]||'OUT'}</b><span>${timeStr(t.time)}</span></div></div>`}).join('');
   grid.querySelectorAll('.row').forEach(c=>{if(shown.has(c.dataset.id))c.style.animation='none'});
   shown=new Set(rows.map(t=>t.id));
@@ -276,11 +278,11 @@ function render(){
   if(!taps.length){grid.innerHTML='<div class="empty">Tap your card to check in<small>Arrivals and departures will show here</small></div>';shown=new Set();return}
   grid.innerHTML=taps.slice(0,SLOTS).map((t,i)=>{
     const ty=TYPES[t.type]||TYPES.out,k=kidCache.get(t.kidId)||{},gs=gradeSec(k.section||t.section);
-    const photo=school.mode!=='initials'&&okPhoto(k.photo)?`<img src="${k.photo}" alt="">`:`<div class="ini">${esc(iniOf(t.name))}</div>`;
+    const photo=school.mode!=='initials'&&okPhoto(k.photo)?`<img src="${k.photo}" alt="">`:`<div class="ini" style="--h:${hue(k.section||t.section||t.name)}">${esc(iniOf(t.name))}</div>`;
     return `<div class="card ${ty[1]}${i===0?' latest':''}" data-id="${esc(t.id)}">
       <div class="ph">${photo}<span class="chip">${ty[0]}</span></div>
       <div class="info"><div class="nm">${esc(shownName(t.name))}</div>
-      <div class="cls"><b>${esc(gs.g||'')}</b>${esc(gs.s)}</div>
+      <div class="cls" style="--h:${hue(k.section||t.section||t.name)}"><b>${esc(gs.g||'')}</b>${esc(gs.s)}</div>
       <div class="meta"><span class="clk">${timeStr(t.time)}</span><span class="ago" data-t="${t.time}">${ago(t.time)}</span></div></div>
     </div>`}).join('');
   grid.querySelectorAll('.card').forEach(c=>{if(shown.has(c.dataset.id))c.style.animation='none'});
@@ -371,7 +373,7 @@ const MAXSP=4, SPMS=4000;
 let spots=[], spotChain=Promise.resolve(), lastChime=0;
 function spotInner(t,k){
   const ty=TYPES[t.type]||TYPES.out,gs=gradeSec(k.section||t.section);
-  const photo=school.mode!=='initials'&&okPhoto(k.photo)?`<img src="${k.photo}" alt="">`:`<div class="ini">${esc(iniOf(t.name))}</div>`;
+  const photo=school.mode!=='initials'&&okPhoto(k.photo)?`<img src="${k.photo}" alt="">`:`<div class="ini" style="--h:${hue(k.section||t.section||t.name)}">${esc(iniOf(t.name))}</div>`;
   return `<div class="scph">${photo}</div><div class="sctx"><div class="schello">${esc(greet(t))}</div><div class="scg">${esc(greetWord(t))}!</div><div class="scn">${esc(shownName(t.name))}</div><div class="sccls">${esc([gs.g,gs.s,timeStr(t.time)].filter(Boolean).join('  \u00b7  '))}</div><div class="scchip">${ty[0]}</div></div>`;
 }
 // Smooth move: remember where each card is, change the layout, then slide/scale each card from its old place to its new one.
