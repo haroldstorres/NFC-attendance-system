@@ -188,6 +188,30 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // "Child has not arrived" notices. Teachers (for their own sections) and admins create them; the push function reads them.
+    // One per child per day (the id has the date), never changed or deleted.
+    match /alerts/{id} {
+      allow read: if canManage() || isHead() || myAdvised(resource.data.get('section', ''));
+      allow create: if (canManage() || myAdvised(request.resource.data.get('section', '')))
+        && request.resource.data.keys().hasOnly(['kidId', 'name', 'section', 'parentEmails', 'type', 'day', 'time', 'by'])
+        && request.resource.data.type in ['absent', 'late']
+        && request.resource.data.parentEmails is list && request.resource.data.parentEmails.size() <= 6
+        && request.resource.data.time is number
+        && request.resource.data.by == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    // Phone notification registrations from the parent app. Each parent only sees and changes their own.
+    match /pushTokens/{token} {
+      allow read, delete: if request.auth != null && resource.data.email == request.auth.token.email;
+      allow create, update: if request.auth != null && request.auth.token.email_verified == true
+        && request.resource.data.keys().hasOnly(['email', 'prefs', 'time'])
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.prefs is map
+        && request.resource.data.time is number
+        && (resource == null || resource.data.email == request.auth.token.email);
+    }
+
     // Visitors. Gate, staff and admin check visitors in and out; the head can read. The TV only reads (to show a count).
     // Never deleted; the only change allowed afterwards is the time out.
     match /visitors/{id} {
