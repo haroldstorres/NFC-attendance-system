@@ -457,6 +457,7 @@ body.is-login #toast{background:#fff;color:#16323a;box-shadow:0 6px 20px rgba(0,
     <p><button class="btn" id="startBtn">Start scanner</button></p>
   </div></div>
   <div id="result"></div>
+  <div id="offBox" hidden></div>
   <div class="card">
     <strong class="cardh">Manual check-in</strong>
     <div class="note">No card with the child? Pick the child to record a manual check-in. It is marked as manual in the log.</div>
@@ -547,6 +548,7 @@ body.is-login #toast{background:#fff;color:#16323a;box-shadow:0 6px 20px rgba(0,
   <div id="mcWrap" hidden>
     <div id="mcHead"></div>
     <div class="mctiles" id="mcTiles"></div>
+    <div id="mcAlert"></div>
     <div class="sr"><input id="mcQ" type="search" placeholder="Search student name" aria-label="Search student" autocomplete="off"></div>
     <div id="mcList"></div>
   </div>
@@ -554,6 +556,7 @@ body.is-login #toast{background:#fff;color:#16323a;box-shadow:0 6px 20px rgba(0,
     <div class="modal-box">
       <div class="who" style="align-items:center;margin-bottom:8px"><span id="mcAv"></span><div><strong id="mcName" class="mh" style="margin:0"></strong><div class="kd-tags" id="mcTags" style="margin-top:4px"></div></div></div>
       <dl class="kd-dl" id="mcInfo"></dl>
+      <div id="mcReason"></div>
       <p class="row" style="margin-top:12px"><button class="btn" id="mcClose" type="button">Close</button></p>
     </div>
   </div>
@@ -780,7 +783,7 @@ body.is-login #toast{background:#fff;color:#16323a;box-shadow:0 6px 20px rgba(0,
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,createUserWithEmailAndPassword,sendPasswordResetEmail,signOut,updatePassword,reauthenticateWithCredential,EmailAuthProvider} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
-import {getFirestore,collection,addDoc,updateDoc,deleteDoc,getDoc,getDocs,writeBatch,setDoc,doc,query,where,orderBy,onSnapshot} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+import {getFirestore,initializeFirestore,persistentLocalCache,persistentMultipleTabManager,collection,addDoc,updateDoc,deleteDoc,getDoc,getDocs,writeBatch,setDoc,doc,query,where,orderBy,onSnapshot} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
 // Paste the config from the Firebase console here (Project settings > Your apps > Web app).
 const firebaseConfig={
@@ -789,10 +792,16 @@ const firebaseConfig={
   projectId:"school-smart-attendance-52cbf",
   appId:"1:1069393649004:web:dafcf9afdf265f9c83e749"
 };
-const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getFirestore(app);
+const app=initializeApp(firebaseConfig),auth=getAuth(app);
+// Offline support: reads and writes are kept on this device and synced when the internet comes back.
+let db;try{db=initializeFirestore(app,{localCache:persistentLocalCache({tabManager:persistentMultipleTabManager()})})}catch(e){db=getFirestore(app)}
 const auth2=getAuth(initializeApp(firebaseConfig,'creator')); // used only to create staff logins without signing you out
 
 const COOLDOWN=60000;
+// Reasons a teacher can record for an absence. Anything except "none" counts as excused.
+const RSN={sick:'Sick',family:'Family emergency',weather:'Bad weather',other:'Other',none:'No reason given'};
+// Saves while offline never finish until the server confirms, so wait only a moment and let the rest sync in the background.
+const fast=p=>Promise.race([p,new Promise(r=>setTimeout(r,1500))]);
 let myRole='',myName='',mySecs=[],secList=[],kids=[],logs=[],assigning=null,lastTap={},unsub=[],staffList=[];
 const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -845,8 +854,11 @@ onAuthStateChanged(auth,async user=>{
   if(adv&&!mySecs.length){kids=[];logs=[];render()}
   else{const sf=adv?[where('section','in',mySecs)]:[];
   unsub.push(onSnapshot(adv?query(collection(db,'kids'),...sf):collection(db,'kids'),s=>{kids=s.docs.map(d=>({id:d.id,...d.data()}));render();if(myRole==='admin'&&staffList.length)renderStaff()},()=>toast('Could not load the list of children.')));
-  unsub.push(onSnapshot(query(collection(db,'log'),...sf,where('time','>=',start.getTime()),orderBy('time')),s=>{logs=s.docs.map(d=>({id:d.id,...d.data()}));logsLoaded=true;render()},()=>toast('Could not load the log. A Firestore index may be needed: open the browser console (F12) and click the link.')))}
+  unsub.push(onSnapshot(query(collection(db,'log'),...sf,where('time','>=',start.getTime()),orderBy('time')),{includeMetadataChanges:true},s=>{logs=s.docs.map(d=>({id:d.id,...d.data(),_pending:d.metadata.hasPendingWrites}));logsLoaded=true;render()},()=>toast('Could not load the log. A Firestore index may be needed: open the browser console (F12) and click the link.')))}
   if(admin)unsub.push(onSnapshot(query(collection(db,'broadcasts'),orderBy('time','desc')),s=>{bcList=s.docs.slice(0,10).map(d=>({id:d.id,...d.data()}));renderBc()},()=>toast('Could not load past broadcasts.')));
+  if(adv&&mySecs.length){const n=new Date();
+    unsub.push(onSnapshot(query(collection(db,'adjustments'),where('section','in',mySecs),where('month','==',n.getFullYear()+'-'+(n.getMonth()+1))),s=>{advAdj=s.docs.map(d=>({id:d.id,...d.data()}));renderMyClass()},()=>{}));
+    unsub.push(onSnapshot(query(collection(db,'alerts'),where('section','in',mySecs),where('day','==',n.getFullYear()+'-'+(n.getMonth()+1)+'-'+n.getDate())),s=>{alertSent=new Set(s.docs.map(d=>d.id));renderMyClass()},()=>{}))}
   if(admin)unsub.push(onSnapshot(doc(db,'settings','school'),s=>{const d=s.exists()?s.data():{};$('parentEditChk').checked=!!d.parentEdit;$('parentReqChk').checked=!!d.parentRequests},()=>{}));
   if(myRole==='admin'||myRole==='staff')unsub.push(onSnapshot(query(collection(db,'childReports'),where('status','==','open')),s=>{repList=s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>a.time-b.time);renderReq()},()=>toast('Could not load parent reports.')));
   if(myRole==='admin'||myRole==='staff')unsub.push(onSnapshot(query(collection(db,'changeRequests'),where('status','==','pending')),s=>{reqList=s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>a.time-b.time);renderReq()},()=>toast('Could not load change requests.')));
@@ -904,7 +916,10 @@ async function recordTap(k,manual){
   const entry={kidId:k.id,name:k.name,time:now,type,parentEmails:emailsOf(k),section:k.section||''};
   // Only the staff member's id is stored (not the email): parents can read the log.
   if(manual){entry.manual=true;entry.by=(auth.currentUser||{}).uid||''}
-  try{await addDoc(collection(db,'log'),entry)}catch(e){lastTap[k.id]=0;toast('The tap could not be saved. Check the internet connection.');return}
+  // Offline, the write is saved on this device and the promise only finishes once the server confirms it, so do not wait for it.
+  const wp=addDoc(collection(db,'log'),entry);
+  try{await Promise.race([wp,new Promise(r=>setTimeout(r,1500))])}catch(e){lastTap[k.id]=0;toast('The tap could not be saved ('+(e.code||'error')+').');return}
+  wp.catch(()=>{lastTap[k.id]=0;toast('A saved tap was rejected by the server and could not be recorded.')});
   showResult(k,entry);
   if(navigator.vibrate)navigator.vibrate(120)}
 
@@ -916,6 +931,7 @@ function showResult(k,e){
   z.classList.add('hit');setTimeout(()=>z.classList.remove('hit'),1800);
   const m=message(k,e);
   r.innerHTML=`<div class="card"><div class="row"><div class="who" style="align-items:center">${av(k,true)}<strong>${esc(k.name)}</strong></div><span style="display:flex;gap:6px;align-items:center">${e.manual?'<span class="tag">Manual</span>':''}<span class="tag ok">${tl(e.type)} ${fmt(e.time)}</span></span></div>
+  ${navigator.onLine?'':'<div class="note">Saved on this device. It will be sent when the internet is back.</div>'}
   <div class="msg">${esc(m)}</div>
   <a class="btn sm" href="sms:${encodeURIComponent(k.phone)}?body=${encodeURIComponent(m)}">Send to ${esc(k.parent||'parent')}</a></div>`}
 
@@ -1104,7 +1120,16 @@ $('kdCard').onclick=()=>{if(!kdId)return;assigning=kdId;toast('Tap the new card 
 $('kdEdit').onclick=()=>{const k=kids.find(x=>x.id===kdId);if(!k)return;closeKd();openKid(k)};
 $('kdDel').onclick=()=>{if(!kdId||!confirm('Remove this child?'))return;const id=kdId;closeKd();deleteDoc(doc(db,'kids',id)).catch(()=>toast('Could not remove.'))};
 
-function render(){fillSec();renderSecs();renderInside();renderMyClass();renderDashboard();
+// Offline banner and the list of taps that are saved on this device but not sent yet.
+function renderOffline(){
+  const box=$('offBox');if(!box)return;
+  const off=!navigator.onLine,pend=logs.filter(l=>l._pending).sort((a,b)=>b.time-a.time);
+  if(!off&&!pend.length){box.hidden=true;box.innerHTML='';return}
+  box.hidden=false;
+  box.innerHTML=(off?`<div class="warn"><strong>No internet</strong><div>Taps still work. They are saved on this device and sent when the internet is back.</div></div>`:`<div class="warn clear"><strong>Syncing</strong><div>Sending saved taps to the school...</div></div>`)
+    +(pend.length?`<div class="card"><div class="row"><strong>Waiting to be sent (${pend.length})</strong><span class="note">Auto-sync</span></div>${pend.map(l=>`<div class="row" style="padding:6px 0;border-top:1px solid var(--line)"><span>${esc(l.name||'')}</span><span class="note">${tl(l.type)} ${fmt(l.time)}</span></div>`).join('')}</div>`:'')}
+window.addEventListener('online',renderOffline);window.addEventListener('offline',renderOffline);
+function render(){renderOffline();fillSec();renderSecs();renderInside();renderMyClass();renderDashboard();
   fillSim();
   fillKidFilter();const kview=viewKids();
   $('kidList').innerHTML=kids.length?(kview.length?kview.map(k=>k._h?`<div class="day">${esc(k._h)}</div>`:kTile(k)).join(''):'<p class="note">No children match this filter.</p>'):'<p class="note">No children yet. Tap "+ Add child" above.</p>';
@@ -1425,7 +1450,7 @@ function drawSF2(){sfMode='m';
   <div class="frm"><div><label for="adjSt">Status</label><select id="adjSt"><option value="P">Present</option><option value="T">Late</option><option value="A">Absent</option></select></div></div>
   <div class="frm"><div><label for="adjNote">Note (optional)</label><input id="adjNote" autocomplete="off"></div></div>
   <p class="row"><button class="btn" id="adjSave">Save</button></p>`:'<p class="note">No class days or learners to edit yet.</p>'}
-  ${(()=>{const ea=(L.adj||[]).filter(a=>a.status!=='auto');return ea.length?`<details class="adjHist" id="adjHist"${sfHistOpen?' open':''}><summary>Edited attendance (${ea.length})</summary>${ea.sort((a,b)=>a.day-b.day).map(a=>`<div class="msg"><strong>${esc(a.name)}</strong>, ${monN} ${a.day}: ${ST[a.prev||'']} &rarr; <strong>${ST[a.status]}</strong><br><span class="note">${esc(a.byEmail||'')} ${new Date(a.at).toLocaleString('en-PH')}${a.note?' - '+esc(a.note):''}</span> <button class="btn alt sm" data-undo="${esc(a.id)}">Undo</button></div>`).join('')}</details>`:''})()}
+  ${(()=>{const ea=(L.adj||[]).filter(a=>a.status!=='auto');return ea.length?`<details class="adjHist" id="adjHist"${sfHistOpen?' open':''}><summary>Edited attendance (${ea.length})</summary>${ea.sort((a,b)=>a.day-b.day).map(a=>`<div class="msg"><strong>${esc(a.name)}</strong>, ${monN} ${a.day}: ${ST[a.prev||'']} &rarr; <strong>${ST[a.status]}</strong><br><span class="note">${esc(a.byEmail||'')} ${new Date(a.at).toLocaleString('en-PH')}${a.reason&&a.reason!=='none'?' - Excused: '+esc(RSN[a.reason]||a.reason):''}${a.note?' - '+esc(a.note):''}</span> <button class="btn alt sm" data-undo="${esc(a.id)}">Undo</button></div>`).join('')}</details>`:''})()}
   </details>
   <div class="sfview"><div class="sfpaper">
   <div class="sfhd"><img class="logo" alt="Logo left" src="${sfLogoCur}"><img class="logo r" alt="Logo right" src="${sfLogoCur2}"><div class="sft">School Form 2 (SF2) Daily Attendance Report of Learners</div><div class="sfs">(This replaced Form 1, Form 2 &amp; STS Form 4 - Absenteeism and Dropout Profile)</div></div>
@@ -1727,7 +1752,31 @@ function renderDashboard(){
   $('dbAttn').innerHTML=`<div class="dbh">Needs attention</div>`+(items.join('')||'<p class="note">Nothing needs attention right now.</p>');
   document.querySelectorAll('#dbAttn [data-go]').forEach(b=>b.onclick=()=>showTab(b.dataset.go))}
 // --- My Class: the adviser's home tab (own sections, today's status per student)
-let mcSec='',mcFilter='all',mcId=null;
+let mcSec='',mcFilter='all',mcId=null,advAdj=[],alertSent=new Set();
+const dayStr=()=>{const n=new Date();return n.getFullYear()+'-'+(n.getMonth()+1)+'-'+n.getDate()};
+// Absence reason saved for today (an attendance edit with status Absent), if any.
+const adjToday=kidId=>advAdj.find(a=>a.id===kidId+'_'+dayStr()&&a.status==='A');
+// Sends the parents an app notification that their child has not arrived. One per child per day.
+async function sendAbsentAlert(list){
+  const b=writeBatch(db),ds=dayStr();let c=0;
+  list.forEach(k=>{const em=emailsOf(k);if(!em.length||alertSent.has(k.id+'_'+ds+'_absent'))return;
+    b.set(doc(db,'alerts',k.id+'_'+ds+'_absent'),{kidId:k.id,name:k.name,section:k.section||'',parentEmails:em,type:'absent',day:ds,time:Date.now(),by:(auth.currentUser||{}).uid||''});c++});
+  if(!c){toast('Nobody to notify (already sent, or no parent email).');return}
+  try{await fast(b.commit());toast('Notified '+c+' parent'+(c>1?'s':''))}
+  catch(e){toast(e.code==='permission-denied'?'Could not send. Have the rules for "alerts" been published?':'Could not send ('+(e.code||'error')+').')}}
+async function saveReason(){
+  const k=kids.find(x=>x.id===mcId);if(!k)return;
+  const n=new Date(),key=n.getFullYear()+'-'+(n.getMonth()+1),day=n.getDate(),id=k.id+'_'+key+'-'+day,old=advAdj.find(a=>a.id===id),
+    reason=$('mcRsn').value,note=$('mcRsnNote').value.trim();
+  const rec={kidId:k.id,name:k.name,section:k.section||'',month:key,day,status:'A',prev:'',reason,excused:reason!=='none',note,...who(),at:Date.now(),
+    history:old?(old.history||[]).concat([{status:old.status,by:old.byEmail||old.by,at:old.at,note:old.note||''}]):[]};
+  try{await fast(setDoc(doc(db,'adjustments',id),rec));toast('Saved')}catch(e){toast('Could not save ('+(e.code||'error')+'). Have the rules for "adjustments" been published?')}}
+async function clearReason(){
+  const k=kids.find(x=>x.id===mcId);if(!k)return;
+  const n=new Date(),id=k.id+'_'+n.getFullYear()+'-'+(n.getMonth()+1)+'-'+n.getDate(),old=advAdj.find(a=>a.id===id);if(!old)return;
+  const rec={...old};delete rec.id;
+  Object.assign(rec,{status:'auto',reason:'',excused:false,note:'Reason removed',...who(),at:Date.now(),history:(old.history||[]).concat([{status:old.status,by:old.byEmail||old.by,at:old.at,note:old.note||''}])});
+  try{await fast(setDoc(doc(db,'adjustments',id),rec));toast('Reason removed')}catch(e){toast('Could not save ('+(e.code||'error')+').')}}
 function mcStatus(l){return !l?'none':AT(l.type)?'in':l.type==='lunch'?'lunch':'out'}
 function renderMyClass(){
   if(myRole!=='adviser')return;
@@ -1746,6 +1795,21 @@ function renderMyClass(){
   const q=$('mcQ').value,list=ks.filter(k=>(mcFilter==='all'||st(k)===mcFilter)&&qMatch(k.name,q));
   const tag=k=>{const l=last[k.id],s=st(k);return s==='none'?'<span class="tag no">No tap yet</span>':`<span class="tag ${s==='in'?'ok':''}">${s==='in'?'Inside':s==='lunch'?'Lunch':'Left'} ${fmt(l.time)}</span>`};
   $('mcList').innerHTML=ks.length?(list.length?list.map(k=>`<button type="button" class="stl" data-mck="${k.id}">${av(k)}<span class="meta"><strong>${esc(k.name)}</strong><small>${esc(k.parent||(k.sex==='M'?'Male':k.sex==='F'?'Female':''))}</small></span>${tag(k)}</button>`).join(''):'<p class="note">No students match.</p>'):'<p class="note">No students in this section yet.</p>';
+  // Not arrived yet (only after the late time) and late today, with a button to notify the parents.
+  {const nowD=new Date(),cutM=toMin($('sfCut').value||'07:30'),pastCut=nowD.getHours()*60+nowD.getMinutes()>cutM,ds=dayStr(),
+    sent=k=>alertSent.has(k.id+'_'+ds+'_absent'),
+    miss=pastCut?ks.filter(k=>st(k)==='none'):[],
+    todo=miss.filter(k=>!adjToday(k.id)&&!sent(k)&&emailsOf(k).length),
+    fin={};[...logs].sort((a,b)=>a.time-b.time).forEach(l=>{if(l.type==='in'&&!fin[l.kidId])fin[l.kidId]=l});
+    const lateL=ks.filter(k=>{const l=fin[k.id];if(!l)return false;const d=new Date(l.time);return d.getHours()*60+d.getMinutes()>cutM});
+    let h='';
+    if(miss.length)h+=`<div class="warn"><div class="row"><strong>Not arrived yet (${miss.length})</strong>${todo.length?`<button type="button" class="btn sm" id="mcNotifyAll">Notify all (${todo.length})</button>`:''}</div>`
+      +miss.map(k=>{const a=adjToday(k.id),em=emailsOf(k).length,info=a?'Excused: '+(RSN[a.reason]||'Absent'):sent(k)?'Parent notified':em?'No tap yet':'No parent email';
+        return `<div class="row" style="padding:8px 0;border-top:1px solid var(--line);flex-wrap:nowrap"><button type="button" class="stl" data-mck="${k.id}" style="flex:1;min-width:0">${av(k)}<span class="meta"><strong>${esc(k.name)}</strong><small>${esc(info)}</small></span></button>${a||sent(k)||!em?'':`<button type="button" class="btn alt sm" data-mcn="${k.id}" aria-label="Notify the parent of ${esc(k.name)}">Notify</button>`}</div>`}).join('')+'</div>';
+    if(lateL.length)h+=`<div class="card"><strong>Late today (${lateL.length})</strong>${lateL.map(k=>`<div class="row" style="padding:6px 0;border-top:1px solid var(--line)"><span>${esc(k.name)}</span><span class="note">${fmt(fin[k.id].time)}</span></div>`).join('')}</div>`;
+    $('mcAlert').innerHTML=h;
+    document.querySelectorAll('[data-mcn]').forEach(b=>b.onclick=()=>sendAbsentAlert(ks.filter(k=>k.id===b.dataset.mcn)));
+    {const na=$('mcNotifyAll');if(na)na.onclick=()=>sendAbsentAlert(todo)}}
   document.querySelectorAll('[data-mck]').forEach(b=>b.onclick=()=>openMc(b.dataset.mck));
   if(!$('mcModal').hidden)fillMc()}
 function fillMc(){
@@ -1757,7 +1821,17 @@ function fillMc(){
   if(k.birthdate){const bp=k.birthdate.split('-').map(Number);if(bp.length===3&&bp[0])rows.push(['Birthdate',esc(new Date(bp[0],bp[1]-1,bp[2]).toLocaleDateString('en-PH',{year:'numeric',month:'short',day:'numeric'}))])}
   $('mcAv').innerHTML=av(k,true);$('mcName').textContent=k.name;
   $('mcTags').innerHTML=`<span class="tag">${k.sex==='M'?'Male':k.sex==='F'?'Female':'Sex not set'}</span><span class="tag ${k.uid?'ok':'no'}">${k.uid?'Has card':'No card'}</span>`;
-  $('mcInfo').innerHTML=rows.map(r=>`<dt>${r[0]}</dt><dd>${r[1]}</dd>`).join('')}
+  $('mcInfo').innerHTML=rows.map(r=>`<dt>${r[0]}</dt><dd>${r[1]}</dd>`).join('');
+  // Absence reason: only for a child with no tap today. It is saved as an attendance edit (Absent) with the reason, who and when.
+  const ad=adjToday(k.id),keep=$('mcReason').contains(document.activeElement);
+  if(mine.length&&!ad){$('mcReason').innerHTML='';return}
+  if(keep)return;
+  $('mcReason').innerHTML=`<div class="card"><strong>Absence reason</strong>
+    ${ad?`<div class="note">Saved: ${esc(RSN[ad.reason]||'Absent')}${ad.note?' - '+esc(ad.note):''}<br>${esc(ad.byEmail||'')} ${new Date(ad.at).toLocaleString('en-PH')}</div>`:'<div class="note">No tap yet today. Record why, and it is kept in the attendance edit history.</div>'}
+    <label for="mcRsn">Reason</label><select id="mcRsn">${Object.entries(RSN).map(([v,t])=>`<option value="${v}"${ad&&ad.reason===v?' selected':''}>${t}</option>`).join('')}</select>
+    <label for="mcRsnNote">Note (optional)</label><input id="mcRsnNote" autocomplete="off" value="${esc((ad&&ad.note)||'')}">
+    <p class="row" style="justify-content:flex-start"><button type="button" class="btn sm" id="mcRsnSave">Save reason</button>${ad?'<button type="button" class="btn alt sm" id="mcRsnClear">Remove</button>':''}</p></div>`;
+  $('mcRsnSave').onclick=saveReason;{const c=$('mcRsnClear');if(c)c.onclick=clearReason}}
 function openMc(id){mcId=id;fillMc();$('mcModal').hidden=false;document.body.classList.add('modal-open');$('mcModal').firstElementChild.scrollTop=0}
 function closeMc(){$('mcModal').hidden=true;document.body.classList.remove('modal-open');mcId=null}
 $('mcClose').onclick=closeMc;
