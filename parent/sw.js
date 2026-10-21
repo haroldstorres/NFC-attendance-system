@@ -11,6 +11,6 @@ self.addEventListener('fetch',e=>{
 self.addEventListener('push',e=>{
   let j={};try{j=e.data?e.data.json():{}}catch(_){}
   const d=j.data||j.notification||j;
-  e.waitUntil(self.registration.showNotification(d.title||'Tap-In',{body:d.body||'',icon:'icon-192.png',badge:'icon-192.png',tag:d.tag||undefined}));
+  e.waitUntil(self.registration.showNotification(d.title||'Tap-In',{body:d.body||'',icon:'icon-192.png',badge:'icon-192.png',tag:d.tag||undefined,data:{tab:d.tab||'att'}}));
 });
-self.addEventListener('notificationclick',e=>{e.notification.close();e.waitUntil(clients.matchAll({type:'window',includeUncontrolled:true}).then(l=>{for(const c of l){if('focus' in c)return c.focus()}return clients.openWindow('./')}))});
+self.addEventListener('notificationclick',e=>{e.notification.close();const tab=(e.notification.data&&e.notification.data.tab)||'att';e.waitUntil(clients.matchAll({type:'window',includeUncontrolled:true}).then(l=>{for(const c of l){if('focus' in c){c.postMessage({tab});return c.focus()}}return clients.openWindow('./?tab='+tab)}))});
