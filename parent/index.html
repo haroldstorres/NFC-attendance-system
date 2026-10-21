@@ -327,7 +327,7 @@ onAuthStateChanged(auth,user=>{
   if(unsubB){unsubB();unsubB=null}
   annMax=0;annReady=false;$('ann').innerHTML='';
   allLogs=null;$('kids').innerHTML='';$('report').innerHTML='';$('annBadge').hidden=true;{const n=new Date();repY=n.getFullYear();repM=n.getMonth()}setTab('att');
-  unsubC.forEach(u=>u());unsubC=[];closeModal();kidsReady=false;myKids=[];myReqs=[];myReports=[];open={};$('contacts').innerHTML='';
+  unsubC.forEach(u=>u());unsubC=[];closeModal();kidsReady=false;myKids=[];myReqs=[];myReports=[];myNotes=[];open={};$('contacts').innerHTML='';
   $('who').textContent='';
   $('outBtn').hidden=!user;$('pwBtn').hidden=!(user&&user.emailVerified);if(!user)$('pwCard').hidden=true;$('login').hidden=!!user;document.body.classList.toggle('is-login',!user);$('verify').hidden=true;$('app').hidden=true;
   if(!user)return;
@@ -356,7 +356,8 @@ function start(user){$('pwBtn').hidden=false;goTabParam();
     onSnapshot(query(collection(db,'kids'),where('parentEmails','array-contains',em)),s=>{kidsReady=true;myKids=s.docs.map(d=>({id:d.id,...d.data()}));renderContacts();if(allLogs)render(allLogs);renderReport()},()=>{}),
     onSnapshot(doc(db,'settings','school'),s=>{const d=s.exists()?s.data():{};parentEdit=!!d.parentEdit;parentReq=!!d.parentRequests;showBrand(d);renderContacts();renderReport()},()=>{parentEdit=false;parentReq=false;renderContacts()}),
     onSnapshot(query(collection(db,'changeRequests'),where('parentEmail','==',em)),s=>{myReqs=s.docs.map(d=>({id:d.id,...d.data()}));renderContacts()},()=>{}),
-    onSnapshot(query(collection(db,'childReports'),where('parentEmail','==',em)),s=>{myReports=s.docs.map(d=>({id:d.id,...d.data()}));if(mKid)renderModal()},()=>{})];
+    onSnapshot(query(collection(db,'childReports'),where('parentEmail','==',em)),s=>{myReports=s.docs.map(d=>({id:d.id,...d.data()}));if(mKid)renderModal()},()=>{}),
+    onSnapshot(query(collection(db,'absenceNotes'),where('parentEmail','==',em)),s=>{myNotes=s.docs.map(d=>({id:d.id,...d.data()}));if(mKid)renderModal()},()=>{})];
   setAlertBox();renderPush();savePush()}
 
 // --- school announcements (broadcasts)
@@ -474,12 +475,25 @@ async function reportKid(tap){
   const note=await askText('Add a note for the school (optional):',{ok:'Send'});if(note===null)return;
   try{await addDoc(collection(db,'childReports'),{kidId:k.id,kidName:String(k.name||'').slice(0,120),section:String(k.section||'').slice(0,80),parentEmail:auth.currentUser.email,tapTime:+tap,message:note.trim().slice(0,300),time:Date.now(),status:'open'});toast('Reported to the school.')}
   catch(err){toast('Could not send the report. Please try again.')}}
+// Parent tells the school ahead that the child will be absent today. One note per child per day.
+const ARSN={sick:'Sick',family:'Family emergency',weather:'Bad weather',other:'Other'};
+const dayStr=d=>d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();
+function absentBlock(k){
+  const n=myNotes.find(r=>r.kidId===k.id&&r.day===dayStr(new Date()));
+  if(n)return `<div class="card" style="margin-top:12px"><strong>You told the school</strong><p class="note">${esc(ARSN[n.reason]||'Absent')}${n.message?' - '+esc(n.message):''}</p></div>`;
+  return `<p class="note" style="margin-top:12px">Will your child be absent today? Tell the teacher why:</p><div class="row" style="justify-content:flex-start;flex-wrap:wrap;gap:6px">${Object.entries(ARSN).map(([v,t])=>`<button type="button" class="btn alt sm" data-act="absent" data-r="${v}">${t}</button>`).join('')}</div>`}
+async function sendAbsence(reason){
+  const k=myKids.find(x=>x.id===mKid);if(!k||!ARSN[reason])return;
+  const note=await askText('Add a note for the teacher (optional):',{ok:'Send to school'});if(note===null)return;
+  const day=dayStr(new Date());
+  try{await setDoc(doc(db,'absenceNotes',k.id+'_'+day),{kidId:k.id,kidName:String(k.name||'').slice(0,120),section:String(k.section||'').slice(0,80),parentEmail:auth.currentUser.email,day,reason,message:note.trim().slice(0,300),time:Date.now()});toast('The teacher has been told.')}
+  catch(err){toast('Could not send. You may have sent one already today.')}}
 function dayBody(x,k){
   const m=MS[x.st],cls={present:'ok',late:'lunch',absent:'bad'}[x.st]||'none',isToday=x.key===ymd(new Date());
   const sub=x.arr?'Arrived '+tm(x.arr.time):({absent:'No tap recorded',off:'Weekend',future:'Not yet'})[x.st]||'';
   const taps=x.a.length?`<div class="day">All taps</div>`+x.a.map(t=>`<div class="row"><span>${({in:'Arrived',out:'Left',lunch:'Out for lunch',back:'Back from lunch'})[t.type]||'Left'}${t.manual?' (manual check-in)':''}</span><span class="pill ${t.type==='in'||t.type==='back'?'in':''}">${tm(t.time)}</span></div>`).join(''):'';
   return `<div class="st ${cls}"><span class="ic">${ic(m[1])}</span><div><strong>${m[0]}</strong><div class="note">${esc(sub)}</div></div></div>`
-    +`<div class="ab"><div class="a1"><small>Arrived</small><b>${x.arr?tm(x.arr.time):'\u2013'}</b></div><div class="a2"><small>Left</small><b>${x.left?tm(x.left.time):(x.arr?(isToday?'Not yet':'No tap'):'\u2013')}</b></div></div>`+taps+(isToday&&x.arr?reportBlock(k,x):'')}
+    +`<div class="ab"><div class="a1"><small>Arrived</small><b>${x.arr?tm(x.arr.time):'\u2013'}</b></div><div class="a2"><small>Left</small><b>${x.left?tm(x.left.time):(x.arr?(isToday?'Not yet':'No tap'):'\u2013')}</b></div></div>`+taps+(isToday&&x.arr?reportBlock(k,x):'')+(isToday&&!x.arr?absentBlock(k):'')}
 function weekBody(days){
   return statTiles(mStats(days))+`<div class="wr wh"><span>Day</span><span>Status</span><span>In</span><span>Out</span></div>`
     +days.map(x=>{const m=MS[x.st];return `<button type="button" class="wr" data-go="${x.key}"><span>${esc(fd(x.d,{weekday:'short',month:'short',day:'numeric'}))}</span><span class="pill ${m[2]}">${m[0]}</span><span>${x.arr?tm(x.arr.time):'\u2013'}</span><span>${x.left?tm(x.left.time):'\u2013'}</span></button>`}).join('')}
@@ -505,6 +519,7 @@ function modalClick(e){
   const t=e.target;
   if(t.id==='kmodal'||t.closest('[data-act="close"]'))return closeModal();
   const rp=t.closest('[data-act="report"]');if(rp)return reportKid(rp.dataset.tap);
+  const ab=t.closest('[data-act="absent"]');if(ab)return sendAbsence(ab.dataset.r);
   const v=t.closest('[data-view]');if(v){mView=v.dataset.view;return renderModal()}
   const s=t.closest('[data-step]');if(s)return stepDate(+s.dataset.step);
   const g=t.closest('[data-go]');if(g){const [y,mo,d]=g.dataset.go.split('-').map(Number);mDate=new Date(y,mo-1,d);mView='day';renderModal()}}
@@ -534,7 +549,7 @@ function renderReport(){
 $('report').onclick=e=>{const b=e.target.closest('[data-m]');if(!b)return;const d=new Date(repY,repM+ +b.dataset.m,1);repY=d.getFullYear();repM=d.getMonth();renderReport()};
 
 // --- contact details and change requests
-let kidsReady=false,myKids=[],myReqs=[],myReports=[],parentEdit=false,parentReq=false,open={};
+let kidsReady=false,myKids=[],myReqs=[],myReports=[],myNotes=[],parentEdit=false,parentReq=false,open={};
 const reqTxt={pending:'Waiting for the school',done:'Done',declined:'Declined'};
 const okPhone=v=>/^[0-9+\-() ]{7,30}$/.test(v)&&v.replace(/\D/g,'').length>=7;
 function renderContacts(){if(Object.keys(open).length)return;drawContacts()}
