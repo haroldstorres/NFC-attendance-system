@@ -521,7 +521,7 @@ body.is-login #toast{background:#fff;color:#16323a;box-shadow:0 6px 20px rgba(0,
 </section>
 
 <section id="tab-log">
-  <div class="row" style="margin-bottom:10px"><strong id="logHead">Today</strong><button class="btn alt sm" id="csvBtn">Copy as CSV</button></div>
+  <div class="row" style="margin-bottom:10px"><strong id="logHead">Today</strong><span style="display:flex;gap:6px"><button class="btn alt sm" id="csvBtn">Copy as CSV</button><button class="btn alt sm" id="logXlsx" type="button">Excel</button></span></div>
   <div class="dbstats lgstats" id="logStats" aria-live="polite"></div>
   <div class="lgbar">
     <div class="lgdate"><button class="btn alt sm" id="logPrev" type="button" aria-label="Previous day">&#8249;</button><input id="logDate" type="date" aria-label="Log date"><button class="btn alt sm" id="logNext" type="button" aria-label="Next day">&#8250;</button><button class="btn alt sm" id="logToday" type="button">Today</button></div>
@@ -595,7 +595,7 @@ body.is-login #toast{background:#fff;color:#16323a;box-shadow:0 6px 20px rgba(0,
   </div>
   <div class="noprint"><div class="row" style="margin-bottom:6px"><strong id="visInHead">Visitors inside</strong></div><div id="visInList"></div></div>
   <div class="vprint"><h2 id="vpSchool"></h2><div>Visitor log: <span id="vpDate"></span></div></div>
-  <div class="row noprint" style="margin:18px 0 6px"><strong id="visLogHead">Today</strong><span style="display:flex;gap:6px"><button class="btn alt sm" id="visCsv" type="button">Copy as CSV</button><button class="btn alt sm" id="visPrint" type="button">Print / PDF</button></span></div>
+  <div class="row noprint" style="margin:18px 0 6px"><strong id="visLogHead">Today</strong><span style="display:flex;gap:6px"><button class="btn alt sm" id="visCsv" type="button">Copy as CSV</button><button class="btn alt sm" id="visXlsx" type="button">Excel</button><button class="btn alt sm" id="visPrint" type="button">Print / PDF</button></span></div>
   <div class="sr noprint"><input id="visQ" type="search" placeholder="Search name, purpose or who they visited" aria-label="Search visitor log" autocomplete="off"><button class="btn alt sm" id="visClear" type="button" hidden>Clear</button></div>
   <div class="sr noprint"><input id="visDate" type="date" aria-label="Choose a date"><button class="btn alt sm" id="visToday" type="button">Today</button></div>
   <div id="visLog" class="vwrap"></div>
@@ -662,7 +662,7 @@ body.is-login #toast{background:#fff;color:#16323a;box-shadow:0 6px 20px rgba(0,
     <label for="sfMonth">Month</label><input id="sfMonth" type="month">
     <div class="frm c2"><div><label for="sfGrade">Grade</label><select id="sfGrade"></select></div><div><label for="sfSecName">Section</label><select id="sfSecName"></select></div></div>
     <select id="sfSec" hidden></select>
-    <p class="row"><span><button class="btn" id="sfGo">Generate SF2</button> <button class="btn alt" id="sfSum">School year summary</button></span><span><button class="btn alt sm" id="sfPrint">Print / PDF</button> <button class="btn alt sm" id="sfCsv">Copy CSV</button></span></p>
+    <p class="row"><span><button class="btn" id="sfGo">Generate SF2</button> <button class="btn alt" id="sfSum">School year summary</button></span><span><button class="btn alt sm" id="sfPrint">Print / PDF</button> <button class="btn alt sm" id="sfCsv">Copy CSV</button> <button class="btn alt sm" id="sfXlsx">Excel</button></span></p>
   </div>
   <div id="sfOut"></div>
 </section>
@@ -900,7 +900,8 @@ onAuthStateChanged(auth,async user=>{
   if(admin)unsub.push(onSnapshot(query(collection(db,'broadcasts'),orderBy('time','desc')),s=>{bcList=s.docs.slice(0,10).map(d=>({id:d.id,...d.data()}));renderBc()},()=>toast('Could not load past broadcasts.')));
   if(adv&&mySecs.length){const n=new Date();
     unsub.push(onSnapshot(query(collection(db,'adjustments'),where('section','in',mySecs),where('month','==',n.getFullYear()+'-'+(n.getMonth()+1))),s=>{advAdj=s.docs.map(d=>({id:d.id,...d.data()}));renderMyClass()},()=>{}));
-    unsub.push(onSnapshot(query(collection(db,'alerts'),where('section','in',mySecs),where('day','==',n.getFullYear()+'-'+(n.getMonth()+1)+'-'+n.getDate())),s=>{alertSent=new Set(s.docs.map(d=>d.id));renderMyClass()},()=>{}))}
+    unsub.push(onSnapshot(query(collection(db,'alerts'),where('section','in',mySecs),where('day','==',n.getFullYear()+'-'+(n.getMonth()+1)+'-'+n.getDate())),s=>{alertSent=new Set(s.docs.map(d=>d.id));renderMyClass()},()=>{}));
+    unsub.push(onSnapshot(query(collection(db,'absenceNotes'),where('section','in',mySecs),where('day','==',n.getFullYear()+'-'+(n.getMonth()+1)+'-'+n.getDate())),s=>{absNotes=s.docs.map(d=>({id:d.id,...d.data()}));renderMyClass()},()=>{}))}
   if(admin)unsub.push(onSnapshot(doc(db,'settings','school'),s=>{const d=s.exists()?s.data():{};$('parentEditChk').checked=!!d.parentEdit;$('parentReqChk').checked=!!d.parentRequests},()=>{}));
   if(myRole==='admin'||myRole==='staff')unsub.push(onSnapshot(query(collection(db,'childReports'),where('status','==','open')),s=>{repList=s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>a.time-b.time);renderReq()},()=>toast('Could not load parent reports.')));
   if(myRole==='admin'||myRole==='staff')unsub.push(onSnapshot(query(collection(db,'changeRequests'),where('status','==','pending')),s=>{reqList=s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>a.time-b.time);renderReq()},()=>toast('Could not load change requests.')));
@@ -1293,6 +1294,26 @@ $('simBtn').onclick=async()=>{
   const k=kids.find(x=>x.id===$('simKid').value);if(!k){toast('Choose a child first.');return}
   if(!(await ask('Record a manual check-in for '+k.name+'?\n\nUse this only when the child does not have the card with them.',{ok:'Record'})))return;
   recordTap(k,true)};
+
+// --- Excel export (SheetJS is loaded only when someone taps an Excel button)
+let xlsxP=null;
+const loadXlsx=()=>window.XLSX?Promise.resolve(window.XLSX):(xlsxP=xlsxP||new Promise((ok,no)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';s.onload=()=>ok(window.XLSX);s.onerror=()=>{xlsxP=null;no(new Error('load'))};document.head.appendChild(s)}));
+async function saveXlsx(name,sheet,rows){
+  try{const X=await loadXlsx(),ws=X.utils.aoa_to_sheet(rows),wb=X.utils.book_new();
+    ws['!cols']=rows[0].map((_,i)=>({wch:Math.min(40,Math.max(6,...rows.slice(0,200).map(r=>String(r[i]==null?'':r[i]).length))+2)}));
+    X.utils.book_append_sheet(wb,ws,sheet.slice(0,31));X.writeFile(wb,name+'-'+new Date().toISOString().slice(0,10)+'.xlsx');toast('Excel file saved')}
+  catch(e){toast('Could not make the Excel file. Check the internet connection and try again.')}}
+$('logXlsx').onclick=()=>{
+  const fl=logState.flags||{};
+  saveXlsx('attendance-log','Log',[['Name','Section','Type','Time','Method','Flags']].concat([...logState.t].reverse().map(l=>[l.name||'',l.section||'',tl(l.type),new Date(l.time).toLocaleString('en-PH'),l.manual?'Manual':'Card',[(fl[l.id]||{}).late&&'Late',(fl[l.id]||{}).noout&&'No OUT'].filter(Boolean).join(' / ')]))) };
+$('visXlsx').onclick=()=>{const L=d=>new Date(d).toLocaleString('en-PH');
+  saveXlsx('visitors','Visitors',[['Name','Purpose','Visiting','Time in','Time out']].concat(visDay.map(v=>[v.name||'',v.purpose||'',v.visiting||'',L(v.timeIn),v.timeOut?L(v.timeOut):'Still inside'])))};
+$('sfXlsx').onclick=()=>{
+  if(sfMode==='s'&&sfSum){const S=sfSum;
+    return saveXlsx('sf2-summary','Summary',[['Name','Sex'].concat(SFMO.map(m=>'Present '+m),['Present TOTAL'],SFMO.map(m=>'Absent '+m),['Absent TOTAL'])].concat(S.rows.map(r=>[r.kid.name||'',r.kid.sex||''].concat(r.att,[sumT(r.att)],r.ab,[sumT(r.ab)]))))}
+  if(!sfLast){toast('Generate the report first.');return}
+  const r=sfCalc(),cd=r.days.filter(x=>x.cls);
+  saveXlsx('sf2','SF2',[['Name','Sex'].concat(cd.map(x=>x.d),['Absent','Tardy'])].concat(r.rows.map(x=>[x.kid.name||'',x.kid.sex||''].concat(r.days.map((d,i)=>d.cls?x.marks[i]:null).filter(v=>v!==null),[x.abs,x.tar]))))};
 
 $('csvBtn').onclick=()=>{
   const fl=logState.flags||{},rows=['Name,Section,Type,Time,Method,Flags'].concat([...logState.t].reverse().map(l=>`"${l.name}","${l.section||''}",${tl(l.type)},${new Date(l.time).toLocaleString('en-PH')},${l.manual?'Manual':'Card'},${[(fl[l.id]||{}).late&&'Late',(fl[l.id]||{}).noout&&'No OUT'].filter(Boolean).join(' / ')}`)).join('\n');
@@ -1794,7 +1815,8 @@ function renderDashboard(){
   $('dbAttn').innerHTML=`<div class="dbh">Needs attention</div>`+(items.join('')||'<p class="note">Nothing needs attention right now.</p>');
   document.querySelectorAll('#dbAttn [data-go]').forEach(b=>b.onclick=()=>showTab(b.dataset.go))}
 // --- My Class: the adviser's home tab (own sections, today's status per student)
-let mcSec='',mcFilter='all',mcId=null,advAdj=[],alertSent=new Set();
+let mcSec='',mcFilter='all',mcId=null,advAdj=[],alertSent=new Set(),absNotes=[];
+const noteOf=kidId=>absNotes.find(n=>n.kidId===kidId);
 const dayStr=()=>{const n=new Date();return n.getFullYear()+'-'+(n.getMonth()+1)+'-'+n.getDate()};
 // Absence reason saved for today (an attendance edit with status Absent), if any.
 const adjToday=kidId=>advAdj.find(a=>a.id===kidId+'_'+dayStr()&&a.status==='A');
@@ -1808,11 +1830,12 @@ async function sendAbsentAlert(list){
   catch(e){toast(e.code==='permission-denied'?'Could not send. Have the rules for "alerts" been published?':'Could not send ('+(e.code||'error')+').')}}
 async function saveReason(){
   const k=kids.find(x=>x.id===mcId);if(!k)return;
-  const n=new Date(),key=n.getFullYear()+'-'+(n.getMonth()+1),day=n.getDate(),id=k.id+'_'+key+'-'+day,old=advAdj.find(a=>a.id===id),
-    reason=$('mcRsn').value,note=$('mcRsnNote').value.trim();
+  return saveReasonFor(k,$('mcRsn').value,$('mcRsnNote').value.trim())}
+async function saveReasonFor(k,reason,note){
+  {const n=new Date(),key=n.getFullYear()+'-'+(n.getMonth()+1),day=n.getDate(),id=k.id+'_'+key+'-'+day,old=advAdj.find(a=>a.id===id);
   const rec={kidId:k.id,name:k.name,section:k.section||'',month:key,day,status:'A',prev:'',reason,excused:reason!=='none',note,...who(),at:Date.now(),
     history:old?(old.history||[]).concat([{status:old.status,by:old.byEmail||old.by,at:old.at,note:old.note||''}]):[]};
-  try{await fast(setDoc(doc(db,'adjustments',id),rec));toast('Saved')}catch(e){toast('Could not save ('+(e.code||'error')+'). Have the rules for "adjustments" been published?')}}
+  try{await fast(setDoc(doc(db,'adjustments',id),rec));toast('Saved')}catch(e){toast('Could not save ('+(e.code||'error')+'). Have the rules for "adjustments" been published?')}}}
 async function clearReason(){
   const k=kids.find(x=>x.id===mcId);if(!k)return;
   const n=new Date(),id=k.id+'_'+n.getFullYear()+'-'+(n.getMonth()+1)+'-'+n.getDate(),old=advAdj.find(a=>a.id===id);if(!old)return;
@@ -1841,15 +1864,18 @@ function renderMyClass(){
   {const nowD=new Date(),cutM=toMin($('sfCut').value||'07:30'),pastCut=nowD.getHours()*60+nowD.getMinutes()>cutM,ds=dayStr(),
     sent=k=>alertSent.has(k.id+'_'+ds+'_absent'),
     miss=pastCut?ks.filter(k=>st(k)==='none'):[],
-    todo=miss.filter(k=>!adjToday(k.id)&&!sent(k)&&emailsOf(k).length),
+    todo=miss.filter(k=>!adjToday(k.id)&&!sent(k)&&!noteOf(k.id)&&emailsOf(k).length),
     fin={};[...logs].sort((a,b)=>a.time-b.time).forEach(l=>{if(l.type==='in'&&!fin[l.kidId])fin[l.kidId]=l});
     const lateL=ks.filter(k=>{const l=fin[k.id];if(!l)return false;const d=new Date(l.time);return d.getHours()*60+d.getMinutes()>cutM});
     let h='';
     if(miss.length)h+=`<div class="warn"><div class="row"><strong>Not arrived yet (${miss.length})</strong>${todo.length?`<button type="button" class="btn sm" id="mcNotifyAll">Notify all (${todo.length})</button>`:''}</div>`
-      +miss.map(k=>{const a=adjToday(k.id),em=emailsOf(k).length,info=a?'Excused: '+(RSN[a.reason]||'Absent'):sent(k)?'Parent notified':em?'No tap yet':'No parent email';
-        return `<div class="row" style="padding:8px 0;border-top:1px solid var(--line);flex-wrap:nowrap"><button type="button" class="stl" data-mck="${k.id}" style="flex:1;min-width:0">${av(k)}<span class="meta"><strong>${esc(k.name)}</strong><small>${esc(info)}</small></span></button>${a||sent(k)||!em?'':`<button type="button" class="btn alt sm" data-mcn="${k.id}" aria-label="Notify the parent of ${esc(k.name)}">Notify</button>`}</div>`}).join('')+'</div>';
+      +miss.map(k=>{const a=adjToday(k.id),em=emailsOf(k).length,info=a?'Excused: '+(RSN[a.reason]||'Absent'):noteOf(k.id)?'Parent says: '+(RSN[noteOf(k.id).reason]||'Absent'):sent(k)?'Parent notified':em?'No tap yet':'No parent email';
+        return `<div class="row" style="padding:8px 0;border-top:1px solid var(--line);flex-wrap:nowrap"><button type="button" class="stl" data-mck="${k.id}" style="flex:1;min-width:0">${av(k)}<span class="meta"><strong>${esc(k.name)}</strong><small>${esc(info)}</small></span></button>${a||sent(k)||!em||noteOf(k.id)?'':`<button type="button" class="btn alt sm" data-mcn="${k.id}" aria-label="Notify the parent of ${esc(k.name)}">Notify</button>`}</div>`}).join('')+'</div>';
+    {const pn=ks.map(k=>({k,n:noteOf(k.id)})).filter(x=>x.n&&!adjToday(x.k.id));
+      if(pn.length)h+=`<div class="card"><strong>Parent absence notes (${pn.length})</strong>${pn.map(x=>`<div class="row" style="padding:8px 0;border-top:1px solid var(--line);flex-wrap:nowrap"><span style="flex:1;min-width:0"><strong>${esc(x.k.name)}</strong><br><small class="note">${esc(RSN[x.n.reason]||'Absent')}${x.n.message?' - '+esc(x.n.message):''}</small></span><button type="button" class="btn sm" data-mcx="${x.k.id}">Excuse</button></div>`).join('')}</div>`}
     if(lateL.length)h+=`<div class="card"><strong>Late today (${lateL.length})</strong>${lateL.map(k=>`<div class="row" style="padding:6px 0;border-top:1px solid var(--line)"><span>${esc(k.name)}</span><span class="note">${fmt(fin[k.id].time)}</span></div>`).join('')}</div>`;
     $('mcAlert').innerHTML=h;
+    document.querySelectorAll('[data-mcx]').forEach(b=>b.onclick=()=>{const k=ks.find(z=>z.id===b.dataset.mcx),n=k&&noteOf(k.id);if(k&&n)saveReasonFor(k,n.reason,('Parent note: '+(n.message||'')).trim())});
     document.querySelectorAll('[data-mcn]').forEach(b=>b.onclick=()=>sendAbsentAlert(ks.filter(k=>k.id===b.dataset.mcn)));
     {const na=$('mcNotifyAll');if(na)na.onclick=()=>sendAbsentAlert(todo)}}
   document.querySelectorAll('[data-mck]').forEach(b=>b.onclick=()=>openMc(b.dataset.mck));
@@ -1865,13 +1891,13 @@ function fillMc(){
   $('mcTags').innerHTML=`<span class="tag">${k.sex==='M'?'Male':k.sex==='F'?'Female':'Sex not set'}</span><span class="tag ${k.uid?'ok':'no'}">${k.uid?'Has card':'No card'}</span>`;
   $('mcInfo').innerHTML=rows.map(r=>`<dt>${r[0]}</dt><dd>${r[1]}</dd>`).join('');
   // Absence reason: only for a child with no tap today. It is saved as an attendance edit (Absent) with the reason, who and when.
-  const ad=adjToday(k.id),keep=$('mcReason').contains(document.activeElement);
+  const ad=adjToday(k.id),pn=!ad&&mine.length===0?noteOf(k.id):null,keep=$('mcReason').contains(document.activeElement);
   if(mine.length&&!ad){$('mcReason').innerHTML='';return}
   if(keep)return;
   $('mcReason').innerHTML=`<div class="card"><strong>Absence reason</strong>
-    ${ad?`<div class="note">Saved: ${esc(RSN[ad.reason]||'Absent')}${ad.note?' - '+esc(ad.note):''}<br>${esc(ad.byEmail||'')} ${new Date(ad.at).toLocaleString('en-PH')}</div>`:'<div class="note">No tap yet today. Record why, and it is kept in the attendance edit history.</div>'}
-    <label for="mcRsn">Reason</label><select id="mcRsn">${Object.entries(RSN).map(([v,t])=>`<option value="${v}"${ad&&ad.reason===v?' selected':''}>${t}</option>`).join('')}</select>
-    <label for="mcRsnNote">Note (optional)</label><input id="mcRsnNote" autocomplete="off" value="${esc((ad&&ad.note)||'')}">
+    ${ad?`<div class="note">Saved: ${esc(RSN[ad.reason]||'Absent')}${ad.note?' - '+esc(ad.note):''}<br>${esc(ad.byEmail||'')} ${new Date(ad.at).toLocaleString('en-PH')}</div>`:pn?`<div class="note">Parent says: ${esc(RSN[pn.reason]||'Absent')}${pn.message?' - '+esc(pn.message):''}<br>${new Date(pn.time).toLocaleString('en-PH')}. Check the reason below and save it to excuse the absence.</div>`:'<div class="note">No tap yet today. Record why, and it is kept in the attendance edit history.</div>'}
+    <label for="mcRsn">Reason</label><select id="mcRsn">${Object.entries(RSN).map(([v,t])=>`<option value="${v}"${(ad?ad.reason:pn&&pn.reason)===v?' selected':''}>${t}</option>`).join('')}</select>
+    <label for="mcRsnNote">Note (optional)</label><input id="mcRsnNote" autocomplete="off" value="${esc((ad&&ad.note)||(pn?('Parent note: '+(pn.message||'')).trim():''))}">
     <p class="row" style="justify-content:flex-start"><button type="button" class="btn sm" id="mcRsnSave">Save reason</button>${ad?'<button type="button" class="btn alt sm" id="mcRsnClear">Remove</button>':''}</p></div>`;
   $('mcRsnSave').onclick=saveReason;{const c=$('mcRsnClear');if(c)c.onclick=clearReason}}
 function openMc(id){mcId=id;fillMc();$('mcModal').hidden=false;document.body.classList.add('modal-open');$('mcModal').firstElementChild.scrollTop=0}
