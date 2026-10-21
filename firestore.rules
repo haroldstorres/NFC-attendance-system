@@ -132,6 +132,26 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // A parent tells the school ahead that the child will be absent today.
+    // One per child per day (the id is kidId_day), never changed or deleted. Teachers read it and decide whether to excuse the absence.
+    match /absenceNotes/{id} {
+      allow read: if canManage() || isHead() || myAdvised(resource.data.get('section', ''))
+        || (request.auth != null && request.auth.token.email_verified == true
+            && resource.data.parentEmail == request.auth.token.email);
+      allow create: if request.auth != null && request.auth.token.email_verified == true
+        && request.resource.data.keys().hasOnly(['kidId', 'kidName', 'section', 'parentEmail', 'day', 'reason', 'message', 'time'])
+        && request.resource.data.parentEmail == request.auth.token.email
+        && id == request.resource.data.kidId + '_' + request.resource.data.day
+        && request.resource.data.day is string && request.resource.data.day.size() <= 12
+        && request.resource.data.reason in ['sick', 'family', 'weather', 'other']
+        && request.resource.data.kidName is string && request.resource.data.kidName.size() <= 120
+        && request.resource.data.section is string && request.resource.data.section.size() <= 80
+        && request.resource.data.message is string && request.resource.data.message.size() <= 300
+        && request.resource.data.time is number
+        && isParent(get(/databases/$(database)/documents/kids/$(request.resource.data.kidId)).data.parentEmails);
+      allow update, delete: if false;
+    }
+
     match /settings/{id} {
       allow read: if isStaff() || (request.auth != null && request.auth.token.email_verified == true);
       allow create, update: if isAdmin() && id == 'school'
