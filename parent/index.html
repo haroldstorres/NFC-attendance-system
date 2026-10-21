@@ -239,6 +239,34 @@ const firebaseConfig={
 // Named app so this session is separate from the staff app (same site, same Firebase project).
 const app=initializeApp(firebaseConfig,'parent'),auth=getAuth(app),db=getFirestore(app);
 const $=id=>document.getElementById(id);
+// --- Confirm and note dialogs that match the app (instead of the browser's own boxes).
+// ask(text,{ok,danger,title}) resolves true/false; askText(title,{ok}) resolves the typed text, or null if cancelled.
+{const st=document.createElement('style');st.textContent='.askdlg{position:fixed;inset:0;z-index:300;display:flex;align-items:center;justify-content:center;padding:12px;background:rgba(5,15,24,.62)}.askbox{width:100%;max-width:420px;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:20px;padding:18px;box-shadow:0 10px 40px rgba(0,0,0,.35)}.askbox h2{margin:0 0 6px;font-size:1.15rem;font-weight:600}.askbox p{margin:0 0 12px;color:var(--mute);white-space:pre-line}.askbox .askrow{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap}.askbox .btn.danger{background:var(--bad);color:#fff}';document.head.appendChild(st)}
+function askDlg(o){return new Promise(res=>{
+  const prev=document.activeElement,el=document.createElement('div'),msg=String(o.message||''),nl=msg.indexOf('\n');
+  let title,body;
+  if(o.input){title=msg.replace(/:\s*$/,'');body=''}
+  else if(o.title){title=o.title;body=msg}
+  else if(nl>0){title=msg.slice(0,nl);body=msg.slice(nl).replace(/^\s+/,'')}
+  else{title='Please confirm';body=msg}
+  el.className='askdlg';
+  el.innerHTML='<div class="askbox" role="alertdialog" aria-modal="true" aria-labelledby="askT"><h2 id="askT"></h2><p id="askM"></p><input id="askI" autocomplete="off" maxlength="300" hidden><div class="askrow"><button type="button" class="btn alt" id="askNo"></button><button type="button" class="btn" id="askYes"></button></div></div>';
+  el.querySelector('#askT').textContent=title;
+  const p=el.querySelector('#askM');p.textContent=body;p.hidden=!body;
+  const inp=el.querySelector('#askI'),no=el.querySelector('#askNo'),yes=el.querySelector('#askYes');
+  inp.hidden=!o.input;no.textContent=o.cancel||'Cancel';yes.textContent=o.ok||(o.input?'Save':'OK');if(o.danger)yes.classList.add('danger');
+  const had=document.body.classList.contains('modal-open');document.body.classList.add('modal-open');
+  const done=v=>{document.removeEventListener('keydown',key,true);el.remove();if(!had)document.body.classList.remove('modal-open');try{prev&&prev.focus&&prev.focus()}catch(e){}res(v)};
+  const ok=()=>done(o.input?inp.value:true),cancel=()=>done(o.input?null:false);
+  function key(e){
+    if(e.key==='Escape'){e.preventDefault();e.stopPropagation();cancel()}
+    else if(e.key==='Enter'&&e.target===inp){e.preventDefault();ok()}
+    else if(e.key==='Tab'){const f=[...el.querySelectorAll('input:not([hidden]),button')],i=f.indexOf(document.activeElement);e.preventDefault();f[(i+(e.shiftKey?-1:1)+f.length)%f.length].focus()}}
+  document.addEventListener('keydown',key,true);
+  el.onclick=e=>{if(e.target===el)cancel()};no.onclick=cancel;yes.onclick=ok;
+  document.body.appendChild(el);(o.input?inp:o.danger?no:yes).focus()})}
+const ask=(message,o={})=>askDlg({message,...o});
+const askText=(message,o={})=>askDlg({message,input:true,...o});
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const tm=t=>new Date(t).toLocaleTimeString('en-PH',{hour:'numeric',minute:'2-digit'});
 const dk=t=>new Date(t).toDateString();
@@ -431,8 +459,8 @@ function reportBlock(k,x){
   return `<p class="note" style="margin-top:12px">Was this arrival a mistake?</p><button type="button" class="btn alt sm" data-act="report" data-tap="${x.arr.time}">My child isn't at school</button>`}
 async function reportKid(tap){
   const k=myKids.find(x=>x.id===mKid);if(!k)return;
-  if(!confirm('Tell the school that '+k.name+' is not at school?\n\nThe school will check right away.'))return;
-  const note=prompt('Add a note for the school (optional):','');if(note===null)return;
+  if(!(await ask('Tell the school that '+k.name+' is not at school?\n\nThe school will check right away.',{ok:'Tell the school'})))return;
+  const note=await askText('Add a note for the school (optional):',{ok:'Send'});if(note===null)return;
   try{await addDoc(collection(db,'childReports'),{kidId:k.id,kidName:String(k.name||'').slice(0,120),section:String(k.section||'').slice(0,80),parentEmail:auth.currentUser.email,tapTime:+tap,message:note.trim().slice(0,300),time:Date.now(),status:'open'});toast('Reported to the school.')}
   catch(err){toast('Could not send the report. Please try again.')}}
 function dayBody(x,k){
