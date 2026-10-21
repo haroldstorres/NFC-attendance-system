@@ -211,6 +211,7 @@ body.is-login #toast{background:#fff;color:#16323a;box-shadow:0 6px 20px rgba(0,
       <p class="note">Get a phone notification when the school posts a notice while this app is open or running in the background.</p>
       <button class="btn sm" id="alertBtn">Turn on alerts</button>
     </div>
+    <div class="card" id="pushBox" hidden></div>
     <div id="ann"></div>
   </section>
   <section id="tab-rep" hidden><div id="report"></div></section>
@@ -226,7 +227,8 @@ body.is-login #toast{background:#fff;color:#16323a;box-shadow:0 6px 20px rgba(0,
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,createUserWithEmailAndPassword,sendEmailVerification,sendPasswordResetEmail,signOut,updatePassword,reauthenticateWithCredential,EmailAuthProvider} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
-import {getFirestore,collection,query,where,orderBy,limit,onSnapshot,doc,updateDoc,addDoc} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+import {getFirestore,collection,query,where,orderBy,limit,onSnapshot,doc,updateDoc,addDoc,setDoc} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+import {getMessaging,getToken} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging.js";
 
 const firebaseConfig={
   apiKey:"AIzaSyCSkppOFLolbgMJe53otK37PYUpUcIXvks",
@@ -314,7 +316,7 @@ function start(user){$('pwBtn').hidden=false;
     onSnapshot(doc(db,'settings','school'),s=>{const d=s.exists()?s.data():{};parentEdit=!!d.parentEdit;parentReq=!!d.parentRequests;showBrand(d);renderContacts();renderReport()},()=>{parentEdit=false;parentReq=false;renderContacts()}),
     onSnapshot(query(collection(db,'changeRequests'),where('parentEmail','==',em)),s=>{myReqs=s.docs.map(d=>({id:d.id,...d.data()}));renderContacts()},()=>{}),
     onSnapshot(query(collection(db,'childReports'),where('parentEmail','==',em)),s=>{myReports=s.docs.map(d=>({id:d.id,...d.data()}));if(mKid)renderModal()},()=>{})];
-  setAlertBox()}
+  setAlertBox();renderPush();savePush()}
 
 // --- school announcements (broadcasts)
 const SEEN='tapin_seen_broadcast';
@@ -325,6 +327,26 @@ const fdt=t=>new Date(t).toLocaleString('en-PH',{weekday:'short',month:'short',d
 function setAlertBox(){$('alertBox').hidden=!('Notification' in window)||Notification.permission!=='default'}
 $('alertBtn').onclick=async()=>{try{await Notification.requestPermission()}catch(e){}setAlertBox();
   toast(Notification.permission==='granted'?'Alerts are on.':'Alerts were not allowed on this device.')};
+// --- phone push notifications (arrival, departure, not arrived). Needs the school's Web Push key; see the setup notes.
+const VAPID_KEY=''; // Firebase console > Project settings > Cloud Messaging > Web Push certificates > Key pair
+let pushPrefs={in:true,out:true,absent:true};
+try{Object.assign(pushPrefs,JSON.parse(localStorage.getItem('tapin-push-prefs')||'{}'))}catch(e){}
+async function pushToken(){
+  if(!VAPID_KEY||!('Notification' in window)||Notification.permission!=='granted'||!('serviceWorker' in navigator))return '';
+  try{const reg=await navigator.serviceWorker.ready;return await getToken(getMessaging(app),{vapidKey:VAPID_KEY,serviceWorkerRegistration:reg})}catch(e){return ''}}
+async function savePush(){
+  const u=auth.currentUser;if(!u)return;const t=await pushToken();if(!t)return;
+  try{await setDoc(doc(db,'pushTokens',t),{email:u.email.toLowerCase(),prefs:pushPrefs,time:Date.now()})}catch(e){}}
+function renderPush(){
+  const b=$('pushBox'),ok=!!VAPID_KEY&&('Notification' in window)&&('serviceWorker' in navigator);
+  b.hidden=!ok;if(!ok)return;
+  const on=Notification.permission==='granted';
+  b.innerHTML='<strong>Phone notifications</strong><p class="note">Get a notification on this phone when your child arrives, leaves, or has not arrived.</p>'
+    +(Notification.permission==='denied'?'<p class="note">Notifications are blocked for this app. Allow them in your phone or browser settings.</p>'
+    :on?[['in','Arrival'],['out','Departure'],['absent','Not arrived']].map(([k,t])=>`<label class="row" style="margin:6px 0"><span>${t}</span><input type="checkbox" data-pp="${k}"${pushPrefs[k]?' checked':''} style="width:auto;min-height:0"></label>`).join('')
+    :'<button class="btn sm" id="pushOn" type="button">Turn on notifications</button>')}
+$('pushBox').onchange=e=>{const k=e.target.dataset&&e.target.dataset.pp;if(!k)return;pushPrefs[k]=e.target.checked;try{localStorage.setItem('tapin-push-prefs',JSON.stringify(pushPrefs))}catch(_){}savePush()};
+$('pushBox').onclick=async e=>{if(e.target.id!=='pushOn')return;try{await Notification.requestPermission()}catch(_){}await savePush();renderPush();setAlertBox()};
 function notify(b){
   if(!('Notification' in window)||Notification.permission!=='granted'||!navigator.serviceWorker)return;
   navigator.serviceWorker.ready.then(r=>r.showNotification(b.title||'School announcement',{body:b.body,icon:'icon-192.png',badge:'icon-192.png',tag:'tapin-'+b.id})).catch(()=>{})}
