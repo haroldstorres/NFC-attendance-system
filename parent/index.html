@@ -167,6 +167,16 @@ body.is-login #toast{background:#fff;color:#16323a;box-shadow:0 6px 20px rgba(0,
   .tabs{max-width:720px}
   #contacts,#report,#ann{grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:14px}
 }
+/* Colorful cards */
+:root{--tg:#17784d;--ta:#9a5f00;--tr:#c2410c;--tb:#0b5f8a;--tp:#6b4fd1;--tt:#0f766e;--ts:#475569;--on:#fff;--tone:var(--tt)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--tg:#4cc790;--ta:#f2b233;--tr:#f08a5d;--tb:#7fd0e6;--tp:#b7a2ff;--tt:#5eead4;--ts:#a3b8c8;--on:#0a1d2c}}
+:root[data-theme="dark"]{--tg:#4cc790;--ta:#f2b233;--tr:#f08a5d;--tb:#7fd0e6;--tp:#b7a2ff;--tt:#5eead4;--ts:#a3b8c8;--on:#0a1d2c}
+#tab-att{--tone:var(--t-green)}#tab-ann{--tone:var(--t-red)}#tab-rep{--tone:var(--t-blue)}
+.card{border-left:5px solid var(--tone);background:linear-gradient(135deg,color-mix(in srgb,var(--tone) 11%,var(--card)) 0%,var(--card) 72%);box-shadow:0 6px 16px -12px var(--tone)}
+.mt{border-left:5px solid var(--c);background:linear-gradient(135deg,color-mix(in srgb,var(--c) 18%,var(--card)) 0%,var(--card) 90%)}
+.st{border-left:5px solid var(--sc);background:linear-gradient(135deg,color-mix(in srgb,var(--sc) 20%,var(--card)) 0%,var(--card) 90%)}
+.st .ic{box-shadow:0 4px 10px -3px var(--sc)}
+@media print{.card{background:#fff!important;box-shadow:none!important}}
 </style>
 </head>
 <body>
