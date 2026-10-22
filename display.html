@@ -205,7 +205,7 @@ html[data-theme="light"] .stat{background:linear-gradient(135deg,color-mix(in sr
 import {initializeAppCheck,ReCaptchaV3Provider} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app-check.js";
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,signOut} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
-import {getFirestore,collection,doc,getDoc,query,where,orderBy,limit,onSnapshot} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+import {getFirestore,collection,doc,getDoc,query,where,orderBy,limit,onSnapshot,getDocs} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
 const firebaseConfig={
   apiKey:"AIzaSyCSkppOFLolbgMJe53otK37PYUpUcIXvks",
@@ -227,7 +227,7 @@ const SLOTS=10, ANNOUNCE_DAYS=7;
 const TYPES={in:['Entry','in'],out:['Exit','out'],lunch:['Lunch','lunch'],back:['Back','back']};
 
 let school={name:'',mode:'full'}, announce=null, taps=[], kidCache=new Map(), pending=new Map(), queue=[], spotOn=true, spotBusy=false;
-let kidIds=null, unsubs=[], firstSnap=true, soundOn=false, audio=null, wake=null, netOnline=navigator.onLine, fromCache=false;
+let kidIds=null, statsLast={}, legacy=false, startGen=0, unsubs=[], firstSnap=true, soundOn=false, audio=null, wake=null, netOnline=navigator.onLine, fromCache=false;
 
 /* ---------- clock ---------- */
 function tick(){
@@ -296,9 +296,13 @@ function render(){
 function renderStats(){
   if(!kidIds){['stIn','stOut','stAbs'].forEach(i=>$(i).textContent='-');return}
   const seen=new Set();let at=0,home=0,lunch=0;
-  for(const t of taps){            // taps are newest first, so the first one seen per child is their latest
-    if(seen.has(t.kidId)||!kidIds.has(t.kidId))continue;seen.add(t.kidId);
-    if(t.type==='in'||t.type==='back')at++;else if(t.type==='lunch')lunch++;else home++;
+  const count=ty=>{if(ty==='in'||ty==='back')at++;else if(ty==='lunch')lunch++;else home++};
+  if(legacy){
+    for(const t of taps){            // taps are newest first, so the first one seen per child is their latest
+      if(seen.has(t.kidId)||!kidIds.has(t.kidId))continue;seen.add(t.kidId);count(t.type)}
+  }else{
+    // Counters kept by the dailyStats function: the latest tap type of every child today.
+    for(const id in statsLast){if(!kidIds.has(id))continue;seen.add(id);count((statsLast[id]||[])[0])}
   }
   const out=home+lunch,abs=kidIds.size-seen.size;
   $('stIn').textContent=at;$('stOut').textContent=out;$('stAbs').textContent=abs;
@@ -431,7 +435,7 @@ $('spBtn').onclick=()=>{
   if(!spotOn){spots.forEach(s=>{clearTimeout(s.timer);s.el.remove()});spots=[];$('spWrap').className='spwrap n1';$('spot').classList.remove('on')}
 };
 function start(){
-  stop();firstSnap=true;
+  stop();firstSnap=true;statsLast={};
   const d0=new Date();d0.setHours(0,0,0,0);
   unsubs.push(onSnapshot(doc(db,'settings','school'),s=>{
     const d=s.exists()?s.data():{};
@@ -444,11 +448,44 @@ function start(){
     try{localStorage.setItem('tvschool',JSON.stringify({n:school.name,l:d.schoolLogo||''}))}catch(e){}
     renderBanner();render();
   },()=>{}));
-  unsubs.push(onSnapshot(collection(db,'kids'),s=>{
+  // The TV reads the small "display" collection (name and section only, kept by the mirrorDisplay function)
+  // and today's counters (dailyStats). If the functions are not deployed yet (display is empty) it falls back to the old way.
+  const gen=++startGen;
+  const kidsLegacy=()=>onSnapshot(collection(db,'kids'),s=>{
     kidIds=new Set();
     s.docs.forEach(x=>{const d=x.data(),old=kidCache.get(x.id)||{};if(d.archived)return;kidIds.add(x.id);kidCache.set(x.id,{photo:d.photo||old.photo||'',section:d.section||'',photoDone:!!(d.photo||old.photoDone)})});
     renderStats();render();
-  },()=>{}));
+  },()=>{});
+  const kidsLight=()=>onSnapshot(collection(db,'display'),s=>{
+    kidIds=new Set();
+    s.docs.forEach(x=>{const d=x.data(),old=kidCache.get(x.id)||{};kidIds.add(x.id);kidCache.set(x.id,{photo:old.photo||'',section:d.section||'',photoDone:!!old.photoDone})});
+    renderStats();render();
+  },()=>{});
+  const day=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Manila'}).format(new Date());
+  const go=lg=>{
+    if(gen!==startGen)return;
+    legacy=lg;
+    unsubs.push(lg?kidsLegacy():kidsLight());
+    if(!lg)unsubs.push(onSnapshot(doc(db,'dailyStats',day),s=>{statsLast=s.exists()?(s.data().last||{}):{};renderStats()},()=>{}));
+    unsubs.push(onSnapshot(
+      query(collection(db,'log'),where('time','>=',d0.getTime()),orderBy('time','desc'),limit(legacy?3000:100)),
+      {includeMetadataChanges:true},
+      s=>{
+        fromCache=s.metadata.fromCache;renderStatus();
+        const added=[];
+        s.docChanges().forEach(c=>{if(c.type==='added'&&!firstSnap)added.push({id:c.doc.id,...c.doc.data()})});
+        taps=s.docs.map(x=>({id:x.id,...x.data()}));
+        taps.slice(0,60).forEach(t=>loadKid(t.kidId));
+        if(taps[0]){$('lastScan').hidden=false;$('lastScan').textContent='Last tap: '+timeStr(taps[0].time)}
+        renderStats();render();
+        if(added.length){added.sort((a,b)=>a.time-b.time);if(spotOn)added.slice(-MAXSP).forEach(t=>{spotChain=spotChain.then(()=>pushSpot(t)).catch(()=>{})});else chime()}
+        if(!s.metadata.fromCache||!firstSnap)firstSnap=false;
+      },
+      e=>{$('statusTxt').textContent='Cannot read taps ('+(e.code||'error')+')';$('status').className='pill off'}
+    ));
+  
+  };
+  getDocs(query(collection(db,'display'),limit(1))).then(r=>go(r.empty)).catch(()=>go(true));
   unsubs.push(onSnapshot(query(collection(db,'visitors'),where('timeIn','>=',d0.getTime())),s=>{
     const n=s.docs.filter(x=>x.data().timeOut===0).length;
     $('stVis').textContent=n;$('stVisS').textContent=n?'inside now':'None inside';
@@ -457,27 +494,11 @@ function start(){
     bcDocs=s.docs.map(x=>x.data());pickAnnounce();
   },()=>{}));
   clearInterval(annTimer);annTimer=setInterval(pickAnnounce,60000);
-  unsubs.push(onSnapshot(
-    query(collection(db,'log'),where('time','>=',d0.getTime()),orderBy('time','desc'),limit(3000)),
-    {includeMetadataChanges:true},
-    s=>{
-      fromCache=s.metadata.fromCache;renderStatus();
-      const added=[];
-      s.docChanges().forEach(c=>{if(c.type==='added'&&!firstSnap)added.push({id:c.doc.id,...c.doc.data()})});
-      taps=s.docs.map(x=>({id:x.id,...x.data()}));
-      taps.slice(0,60).forEach(t=>loadKid(t.kidId));
-      if(taps[0]){$('lastScan').hidden=false;$('lastScan').textContent='Last tap: '+timeStr(taps[0].time)}
-      renderStats();render();
-      if(added.length){added.sort((a,b)=>a.time-b.time);if(spotOn)added.slice(-MAXSP).forEach(t=>{spotChain=spotChain.then(()=>pushSpot(t)).catch(()=>{})});else chime()}
-      if(!s.metadata.fromCache||!firstSnap)firstSnap=false;
-    },
-    e=>{$('statusTxt').textContent='Cannot read taps ('+(e.code||'error')+')';$('status').className='pill off'}
-  ));
   // New school day: reload just after midnight so "today" starts clean.
   const m=new Date();m.setHours(24,0,5,0);
   clearTimeout(start.mid);start.mid=setTimeout(()=>location.reload(),m-Date.now());
 }
-function stop(){unsubs.forEach(u=>u());unsubs=[]}
+function stop(){startGen++;unsubs.forEach(u=>u());unsubs=[]}
 
 /* ---------- sign-in screen: same look as the staff login ---------- */
 try{
