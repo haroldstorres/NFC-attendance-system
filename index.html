@@ -1537,21 +1537,22 @@ function sf2Sheet(){
     box(0,0,0,LAST,'School Form 2 (SF2) Daily Attendance Report of Learners',st({nb:true,font:{b:true,sz:14}}));rh[0]={hpt:24};
     box(1,0,1,LAST,'(This replaces Form 1, Form 2 & STS Form 4 - Absenteeism and Dropout Profile)',st({nb:true,font:{i:true,sz:8}}));
     // Header boxes
-    box(3,0,3,1,'School ID',LBL);box(3,2,3,5,val('sfId'),VAL);box(3,6,3,9,'School Year',LBL);box(3,10,3,13,val('sfYear'),VAL);
-    box(3,14,3,19,'Report for the Month of',LBL);box(3,20,3,25,mon,VAL);
-    box(4,0,4,1,'Name of School',LBL);box(4,2,4,9,val('sfSchool'),VAL);box(4,10,4,13,'Grade Level',LBL);box(4,14,4,17,grade,VAL);
-    box(4,18,4,19,'Section',LBL);box(4,20,4,25,section,VAL);rh[3]={hpt:20};rh[4]={hpt:20};
+    const LB=st({nb:true,font:{b:true},al:{horizontal:'right'}}),VB=st({al:{horizontal:'center'}});
+    box(3,0,3,1,'School ID',LB);box(3,2,3,5,val('sfId'),VB);box(3,6,3,9,'School Year',LB);box(3,10,3,13,val('sfYear'),VB);
+    box(3,14,3,19,'Report for the Month of',LB);box(3,20,3,25,mon,VB);
+    box(4,0,4,1,'Name of School',LB);box(4,2,4,9,val('sfSchool'),VB);box(4,10,4,13,'Grade Level',LB);box(4,14,4,17,grade,VB);
+    box(4,18,4,19,'Section',LB);box(4,20,4,25,section,VB);rh[3]={hpt:20};rh[4]={hpt:20};
     // Table header
-    const H=st({font:{b:true},fill:'E7E6E6'}),H0=5;
+    const H=st({font:{b:true},fill:'FFFFFF'}),H0=5;
     box(H0,0,H0+2,0,'No.',H);
     box(H0,1,H0+2,1,"LEARNER'S NAME\n(Last Name, First Name, Middle Name)",H);
-    box(H0,DC,H0,EA-1,'(1st row for date)',st({font:{b:true,sz:8},fill:'E7E6E6'}));
+    box(H0,DC,H0,EA-1,'(1st row for date)',st({font:{b:true,sz:8},fill:'D9D9D9'}));
     cols.forEach((c,i)=>{const rb=c.wd===6;
-      put(H0+1,DC+i,c.d,st({font:{b:true},fill:'E7E6E6',rb}));
-      put(H0+2,DC+i,WD[c.wd],st({font:{b:true,sz:8},fill:'E7E6E6',rb}))});
-    box(H0,EA,H0,EA+1,'Total for the Month',st({font:{b:true,sz:8},fill:'E7E6E6'}));
+      put(H0+1,DC+i,c.d,st({font:{b:true},fill:'FFFFFF',rb}));
+      put(H0+2,DC+i,WD[c.wd],st({font:{b:true,sz:8},fill:'FFFFFF',rb}))});
+    box(H0,EA,H0,EA+1,'Total for the Month',st({font:{b:true,sz:8},fill:'FFFFFF'}));
     box(H0+1,EA,H0+2,EA,'ABSENT',H);box(H0+1,EA+1,H0+2,EA+1,'PRESENT',H);
-    box(H0,EA+2,H0+2,EA+2,'REMARKS (If DROPPED OUT, state reason, please refer to legend number 2. If TRANSFERRED IN/OUT, write the name of School.)',st({font:{b:true,sz:8},fill:'E7E6E6'}));
+    box(H0,EA+2,H0+2,EA+2,'REMARKS (If DROPPED OUT, state reason, please refer to legend number 2. If TRANSFERRED IN/OUT, write the name of School.)',st({font:{b:true,sz:8},fill:'FFFFFF'}));
     rh[H0]={hpt:18};rh[H0+2]={hpt:16};
     // Data
     let R=H0+3;
@@ -1563,61 +1564,66 @@ function sf2Sheet(){
           put(R,DC+j,m==='A'?'x':m==='T'?'T':'',st({rb,font:m==='A'?{b:true}:{},fill:m==='T'?GRY:(c.cls?null:'F2F2F2')}))});
         put(R,EA,x.abs,st());put(R,EA+1,pres(x),st());put(R,EA+2,x.streak>=5?'Absent 5+ days in a row':'',st({al:{horizontal:'left'},font:{sz:8}}));R++});
       const pd=cols.map(c=>c.cls?g.filter(x=>isP(x.marks[c.d-1])).length:'');
-      const a=g.reduce((t,x)=>t+x.abs,0),p=g.reduce((t,x)=>t+pres(x),0),T=st({font:{b:true},fill:'F2F2F2'});
-      box(R,0,R,1,label+' | TOTAL Per Day',st({font:{b:true},fill:'F2F2F2',al:{horizontal:'right'}}));
-      cols.forEach((c,j)=>put(R,DC+j,pd[j],st({font:{b:true},fill:'F2F2F2',rb:c.wd===6})));
+      const a=g.reduce((t,x)=>t+x.abs,0),p=g.reduce((t,x)=>t+pres(x),0),T=st({font:{b:true},fill:'D9D9D9'});
+      box(R,0,R,1,label+' | TOTAL Per Day',st({font:{b:true},fill:'D9D9D9',al:{horizontal:'left'}}));
+      cols.forEach((c,j)=>put(R,DC+j,pd[j],st({font:{b:true},fill:'D9D9D9',rb:c.wd===6})));
       put(R,EA,a,T);put(R,EA+1,p,T);put(R,EA+2,'',T);R++;
       tot.n[k]=g.length;tot.abs[k]=a;tot.pres[k]=p;tot.pd[k]=pd};
     block('M','MALE');block('F','FEMALE');block('','SEX NOT SET');
     const ks=Object.keys(tot.n),sum=o=>ks.reduce((t,k)=>t+(o[k]||0),0),T2=st({font:{b:true},fill:'D9D9D9'});
-    box(R,0,R,1,'Combined TOTAL PER DAY',st({font:{b:true},fill:'D9D9D9',al:{horizontal:'right'}}));
+    box(R,0,R,1,'Combined TOTAL PER DAY',st({font:{b:true},fill:'D9D9D9',al:{horizontal:'left'}}));
     cols.forEach((c,j)=>put(R,DC+j,c.cls?ks.reduce((t,k)=>t+(+tot.pd[k][j]||0),0):'',st({font:{b:true},fill:'D9D9D9',rb:c.wd===6})));
     put(R,EA,sum(tot.abs),T2);put(R,EA+1,sum(tot.pres),T2);put(R,EA+2,'',T2);R+=2;
-    // Guidelines
-    const W=Math.round(5+38+nd*4.5+9+9+26),TXT=st({nb:true,al:{horizontal:'left',vertical:'top'}});
+    // Bottom: guidelines | codes | summary (like the printed form)
+    const W=Math.round(5+38+nd*4.5+9+9+16),TXT=st({nb:true,al:{horizontal:'left',vertical:'top'}});
     const para=(txt,s)=>{box(R,0,R,LAST,txt,s||TXT);rh[R]={hpt:Math.max(13,Math.ceil(txt.length/(W*1.3))*12.5)};R++};
-    para('GUIDELINES:',st({nb:true,font:{b:true},al:{horizontal:'left'}}));
-    ['1. The attendance shall be accomplished daily. Refer to the codes for checking learners\' attendance.',
-     '2. Dates shall be written in the columns after the Learner\'s Name.',
-     '3. To compute the following:',
-     '     a. Percentage of Enrolment = (Registered Learners as of end of the month / Enrolment as of 1st Friday of the SY) x 100',
-     '     b. Average Daily Attendance = Total Daily Attendance / Number of School Days in reporting month',
-     '     c. Percentage of Attendance for the month = (Average daily attendance / Registered Learners as of end of the month) x 100',
-     '4. Every end of the month, the class adviser will submit this form to the office of the principal for recording of summary table into School Form 4. Once signed by the principal, this form should be returned to the adviser.',
-     '5. The adviser will provide necessary interventions including but not limited to home visitation to learner/s who were absent for 5 consecutive days and reports the action taken to the school head.',
-     '6. Attendance performance of learners will be reflected in Form 137 and Form 138 every grading period.'].forEach(t=>para(t));
-    R++;
-    para('CODES FOR CHECKING ATTENDANCE:',st({nb:true,font:{b:true},al:{horizontal:'left'}}));
-    para('Blank = Present     x = Absent     T = Late / Tardy (arrived after '+(val('sfCut')||'07:30')+', shaded gray; counted as present)');
-    para('Reason/Cause for NLS (No Longer in School): a. Domestic-related factors (a.1 Had to take care of siblings; a.2 Early marriage/pregnancy; a.3 Parents\' attitude toward schooling; a.4 Family problems). b. Individual-related factors (b.1 Illness; b.2 Overage; b.3 Death; b.4 Drug abuse; b.5 Poor academic performance; b.6 Lack of interest/distractions; b.7 Hunger/Malnutrition). c. School-related factors (c.1 Teacher factor; c.2 Physical condition of classroom; c.3 Peer influence). d. Geographic/Environmental (d.1 Distance between home and school; d.2 Armed conflict; d.3 Calamities/disasters). e. Financial-related (e.1 Child labor, work). f. Others (specify).',st({nb:true,al:{horizontal:'left',vertical:'top'},font:{sz:8}}));
-    R++;
-    // Summary
     const eM=+val('sfEnrM')||tot.n.M||0,eF=+val('sfEnrF')||tot.n.F||0,eT=eM+eF+(tot.n['']||0),rM=tot.n.M||0,rF=tot.n.F||0,rT=sum(tot.n);
     const nf=x=>+(+x).toFixed(2),pc=(a,b)=>b?nf(a/b*100):0,av=d=>sd?nf(d/sd):0,dM=tot.pres.M||0,dF=tot.pres.F||0,dT=sum(tot.pres);
     const five=k=>(grp[k]||[]).filter(x=>x.streak>=5).length;
-    const SH=st({font:{b:true},fill:'E7E6E6'}),SL=st({al:{horizontal:'left'}});
-    box(R,0,R,1,'Summary for the month of '+monN,SH);box(R,2,R,5,'Male',SH);box(R,6,R,9,'Female',SH);box(R,10,R,13,'TOTAL',SH);R++;
-    const srow=(lab,m,f,t)=>{box(R,0,R,1,lab,SL);box(R,2,R,5,m,st());box(R,6,R,9,f,st());box(R,10,R,13,t,st());R++};
-    srow('No. of days of classes','','',sd);
-    srow('Enrolment as of 1st Friday of the SY',eM,eF,eT);
-    srow('Registered learners as of end of the month',rM,rF,rT);
-    srow('Percentage of enrolment as of end of the month',pc(rM,eM),pc(rF,eF),pc(rT,eT));
-    srow('Average daily attendance',av(dM),av(dF),av(dT));
-    srow('Percentage of attendance for the month',pc(sd?dM/sd:0,rM),pc(sd?dF/sd:0,rF),pc(sd?dT/sd:0,rT));
-    srow('Number of students absent for 5 consecutive days',five('M'),five('F'),five('M')+five('F')+five(''));
-    R++;
-    // Certification
+    const S0=R,NR=12;for(let i=0;i<NR;i++)rh[S0+i]={hpt:22};
+    const G8=st({nb:true,al:{horizontal:'left',vertical:'top'},font:{sz:8}}),B8=st({al:{horizontal:'left',vertical:'top'},font:{sz:8}});
+    box(S0,0,S0+NR-1,9,['GUIDELINES:',
+      '1. The attendance shall be accomplished daily. Refer to the codes for checking learners\' attendance.',
+      '2. Dates shall be written in the columns after the Learner\'s Name.',
+      '3. To compute the following:',
+      '    a. Percentage of Enrolment = Registered Learners as of end of the month / Enrolment as of 1st Friday of the school year x 100',
+      '    b. Average Daily Attendance = Total Daily Attendance / Number of School Days in reporting month',
+      '    c. Percentage of Attendance for the month = Average daily attendance / Registered Learners as of end of the month x 100',
+      '4. Every end of the month, the class adviser will submit this form to the office of the principal for recording of summary table into School Form 4. Once signed by the principal, this form should be returned to the adviser.',
+      '5. The adviser will provide necessary interventions including but not limited to home visitation to learner/s who were absent for 5 consecutive days and/or those at risk of dropping out.',
+      '6. Attendance performance of learners will be reflected in Form 137 and Form 138 every grading period.',
+      '*Beginning of School Year cut-off report is every 1st Friday of the School Year'].join('\n'),G8);
+    box(S0,10,S0+NR-1,20,['1. CODES FOR CHECKING ATTENDANCE','',
+      '(blank) - Present; (x) - Absent; Tardy (half shaded = Upper for Late Comer, Lower for Cutting Classes)','',
+      '(Late = after '+(val('sfCut')||'07:30')+')','',
+      '2. REASONS/CAUSES FOR NLS','',
+      'a. Domestic-Related Factors','a.1 Had to take care of siblings','a.2 Early marriage/pregnancy','a.3 Parents\' attitude toward schooling','a.4 Family problems','',
+      'b. Individual-Related Factors','b.1 Illness','b.2 Overage','b.3 Death','b.4 Drug Abuse','b.5 Poor academic performance','b.6 Lack of interest/Distractions','b.7 Hunger/Malnutrition','',
+      'c. School-Related Factors','c.1 Teacher Factor','c.2 Physical condition of classroom','c.3 Peer influence','',
+      'd. Geographic/Environmental','d.1 Distance between home and school','d.2 Armed conflict (incl. Tribal wars & clanfeuds)','d.3 Calamities/Disasters','',
+      'e. Financial-Related','e.1 Child labor, work','','f. Others (Specify)'].join('\n'),B8);
+    const SH=st({font:{b:true,sz:8}}),SL=st({al:{horizontal:'center'},font:{i:true,sz:8}}),SB=st({font:{b:true,sz:8}}),SV=st();
+    box(S0,21,S0,EA-1,'Month : '+monN+'     No. of Days of Classes: '+sd,SH);box(S0,EA,S0,EA+2,'Summary',SH);
+    box(S0+1,21,S0+1,EA-1,'',SH);put(S0+1,EA,'M',SH);put(S0+1,EA+1,'F',SH);put(S0+1,EA+2,'TOTAL',SH);
+    let q=S0+2;
+    [['* Enrolment as of 1st Friday of the SY',eM,eF,eT],['Late enrolment during the month (beyond cut-off)','','',''],
+     ['Registered learners as of end of the month',rM,rF,rT],['Percentage of enrolment as of end of the month',pc(rM,eM),pc(rF,eF),pc(rT,eT)],
+     ['Average daily attendance',av(dM),av(dF),av(dT)],['Percentage of attendance for the month',pc(sd?dM/sd:0,rM),pc(sd?dF/sd:0,rF),pc(sd?dT/sd:0,rT)],
+     ['Number of students absent for 5 consecutive days',five('M'),five('F'),five('M')+five('F')+five('')],
+     ['NLS','','',''],['Transferred out','','',''],['Transferred in','','','']].forEach(([lab,a,b,c],i)=>{
+      box(q,21,q,EA-1,lab,i>6?SB:SL);put(q,EA,a,SV);put(q,EA+1,b,SV);put(q,EA+2,c,SV);q++});
+    R=S0+NR+1;
     para('I certify that this is a true and correct report.',st({nb:true,al:{horizontal:'left'}}));R++;
     const sig=(c1,c2,name,cap)=>{box(R,c1,R,c2,name,st({nb:true,font:{b:true},al:{horizontal:'center'}}));
       for(let b=c1;b<=c2;b++)ws[X.utils.encode_cell({r:R,c:b})].s.border={bottom:bl()};
       box(R+1,c1,R+1,c2,cap,st({nb:true,font:{sz:8}}))};
     rh[R]={hpt:22};
-    sig(0,10,val('sfAdv'),'(Signature of Teacher over Printed Name)');
-    sig(14,24,val('sfHead'),'(Signature of School Head over Printed Name)');
-    box(R-1,14,R-1,24,'Attested by:',st({nb:true,al:{horizontal:'left'}}));R+=2;
+    sig(0,10,val('sfAdv'),'(Signature of Adviser over Printed Name)');
+    sig(21,LAST,val('sfHead'),'(Signature of School Head over Printed Name)');
+    box(R-1,21,R-1,LAST,'Attested by:',st({nb:true,al:{horizontal:'left'}}));R+=2;
     ws['!ref']=X.utils.encode_range({s:{r:0,c:0},e:{r:Math.max(maxR,R),c:LAST}});
     ws['!merges']=mg;ws['!rows']=rh;ws['!views']=[{showGridLines:false}];
-    ws['!cols']=[{wch:5},{wch:38}].concat(cols.map(()=>({wch:4.5})),[{wch:9},{wch:9},{wch:26}]);
+    ws['!cols']=[{wch:5},{wch:38}].concat(cols.map(()=>({wch:4.5})),[{wch:9},{wch:9},{wch:16}]);
     ws['!pageSetup']={orientation:'landscape',paperSize:5,fitToWidth:1,fitToHeight:0};
     ws['!sheetPr']={pageSetUpPr:{fitToPage:true}};
     ws['!margins']={left:.3,right:.3,top:.4,bottom:.4,header:.2,footer:.2};
