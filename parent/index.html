@@ -249,7 +249,7 @@ body.is-login #toast{background:#fff;color:#16323a;box-shadow:0 6px 20px rgba(0,
 <div id="toast" role="status"></div>
 
 <script type="module">
-import {initializeAppCheck,ReCaptchaV3Provider} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app-check.js";
+import {initializeAppCheck,ReCaptchaEnterpriseProvider} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app-check.js";
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,createUserWithEmailAndPassword,sendEmailVerification,sendPasswordResetEmail,signOut,updatePassword,reauthenticateWithCredential,EmailAuthProvider} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 import {getFirestore,collection,query,where,orderBy,limit,onSnapshot,doc,updateDoc,addDoc,setDoc} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
@@ -264,8 +264,8 @@ const firebaseConfig={
 // Named app so this session is separate from the staff app (same site, same Firebase project).
 const app=initializeApp(firebaseConfig,'parent'),auth=getAuth(app);
 // App Check: only this real website can talk to Firebase. Paste your reCAPTCHA v3 site key to turn it on (see the notes).
-const APPCHECK_SITE_KEY="";
-if(APPCHECK_SITE_KEY){try{if(location.hostname==="localhost")self.FIREBASE_APPCHECK_DEBUG_TOKEN=true;initializeAppCheck(app,{provider:new ReCaptchaV3Provider(APPCHECK_SITE_KEY),isTokenAutoRefreshEnabled:true})}catch(e){console.warn("App Check did not start",e)}}
+const APPCHECK_SITE_KEY="6Ldh9votAAAAAFuMGdovaafha7pdhZev_FRB8_-L";
+if(APPCHECK_SITE_KEY){try{if(location.hostname==="localhost")self.FIREBASE_APPCHECK_DEBUG_TOKEN=true;initializeAppCheck(app,{provider:new ReCaptchaEnterpriseProvider(APPCHECK_SITE_KEY),isTokenAutoRefreshEnabled:true})}catch(e){console.warn("App Check did not start",e)}}
 const db=getFirestore(app);
 const $=id=>document.getElementById(id);
 // --- Light / dark mode button. The choice is remembered on this device; with no choice it follows the phone or computer setting.
@@ -402,7 +402,7 @@ function setAlertBox(){$('alertBox').hidden=!('Notification' in window)||Notific
 $('alertBtn').onclick=async()=>{try{await Notification.requestPermission()}catch(e){}setAlertBox();
   toast(Notification.permission==='granted'?'Alerts are on.':'Alerts were not allowed on this device.')};
 // --- phone push notifications (arrival, departure, not arrived). Needs the school's Web Push key; see the setup notes.
-const VAPID_KEY=''; // Firebase console > Project settings > Cloud Messaging > Web Push certificates > Key pair
+const VAPID_KEY='BOkCV3IjFknI9a5hOS4w2YrkTzlTwDLsuVjXewLMlZIy-DzQX1rWs9vyw58z0A_WXFjSZGtqdtrJWSbFrRDNe8w'; // Firebase console > Project settings > Cloud Messaging > Web Push certificates > Key pair
 let pushPrefs={in:true,out:true,absent:true};
 try{Object.assign(pushPrefs,JSON.parse(localStorage.getItem('tapin-push-prefs')||'{}'))}catch(e){}
 async function pushToken(){
