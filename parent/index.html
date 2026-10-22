@@ -91,6 +91,9 @@ textarea{resize:vertical;min-height:84px}
 .mo{position:fixed;inset:0;z-index:50;background:rgba(5,15,24,.62);display:flex;align-items:flex-end;justify-content:center}
 .ms{background:var(--bg);color:var(--ink);width:100%;max-width:520px;height:min(720px,90vh);overflow:auto;border-radius:22px 22px 0 0;padding:16px 16px calc(20px + env(safe-area-inset-bottom,0px))}
 @media(min-width:600px){.mo{align-items:center}.ms{border-radius:22px}}
+/* School announcement popup: centered, as tall as its message */
+#amodal{align-items:center;padding:20px;box-sizing:border-box}
+#amodal .ms{height:auto;max-height:80vh;max-width:420px;border-radius:22px;padding-bottom:20px}
 .seg{display:flex;gap:6px;margin:14px 0 10px}
 .seg button{flex:1;min-height:44px;border:2px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink);font:inherit;font-weight:500;cursor:pointer}
 .seg button[aria-pressed="true"]{background:var(--t-green);border-color:var(--t-green);color:var(--t-ink)}
