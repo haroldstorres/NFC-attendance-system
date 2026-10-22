@@ -21,7 +21,8 @@ function appLogic({fields = {}, kids = []} = {}) {
   const tapCode = between(html, 'const AT=t=>', 'async function handleTap');
   const sf2 = between(html, 'function buildSF2', '// SF2-CORE-END');
   const imp = between(html, 'const IMPH=', 'function impRender');
-  const body = `${tapCode}\n${sf2}\n${imp}\nreturn {nextType, inLunch, buildSF2, parseCsv, impPrepare, impBday};`;
+  const ye = between(html, '// YEAREND-CORE-START', '// YEAREND-CORE-END');
+  const body = `${tapCode}\n${sf2}\n${imp}\n${ye}\nreturn {nextType, inLunch, buildSF2, parseCsv, impPrepare, impBday, yearEndPlan, yearEndDefaults, nextGrade};`;
   return new Function('$', 'kids', 'splitName', body)($, kids, splitName);
 }
 
