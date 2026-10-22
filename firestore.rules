@@ -152,6 +152,31 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // Child photos, kept apart from the child record so lists and the TV do not download every photo.
+    // The section and parent emails are copied here only so the same people who can read the child can read the photo.
+    match /kidPhotos/{id} {
+      allow read: if canTap() || isHead() || isDisplay() || myAdvised(resource.data.get('section', ''))
+        || isParent(resource.data.get('parentEmails', []));
+      allow create, update: if canManage()
+        && request.resource.data.keys().hasOnly(['photo', 'section', 'parentEmails'])
+        && request.resource.data.photo is string && request.resource.data.photo.size() <= 150000
+        && request.resource.data.get('section', '') is string && request.resource.data.get('section', '').size() <= 80
+        && request.resource.data.get('parentEmails', []) is list && request.resource.data.get('parentEmails', []).size() <= 6;
+      allow delete: if canManage();
+    }
+
+    // Days with no classes (holidays, suspensions). The id is the date, e.g. 2026-12-25. All staff read; only admins change.
+    match /holidays/{id} {
+      allow read: if isStaff();
+      allow create, update: if isAdmin()
+        && id.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && request.resource.data.keys().hasOnly(['name', 'time', 'by'])
+        && request.resource.data.name is string && request.resource.data.name.size() <= 80
+        && request.resource.data.time is number
+        && request.resource.data.by == request.auth.uid;
+      allow delete: if isAdmin();
+    }
+
     match /settings/{id} {
       allow read: if isStaff() || (request.auth != null && request.auth.token.email_verified == true);
       allow create, update: if isAdmin() && id == 'school'
@@ -184,7 +209,22 @@ service cloud.firestore {
 
     match /log/{id} {
       allow read: if canTap() || isHead() || isDisplay() || myAdvised(resource.data.get('section', '')) || isParent(resource.data.parentEmails);
-      allow create: if canTap();
+      // A tap must be a real one: known fields only, a valid type, an existing child, and a time that is
+      // not in the future and not older than 2 days (2 days still lets taps saved offline sync later).
+      allow create: if canTap()
+        && request.resource.data.keys().hasOnly(['kidId', 'name', 'time', 'type', 'parentEmails', 'section', 'manual', 'by'])
+        && request.resource.data.keys().hasAll(['kidId', 'name', 'time', 'type'])
+        && request.resource.data.type in ['in', 'out', 'lunch', 'back']
+        && request.resource.data.kidId is string && request.resource.data.kidId.size() > 0 && request.resource.data.kidId.size() <= 60
+        && exists(/databases/$(database)/documents/kids/$(request.resource.data.kidId))
+        && request.resource.data.name is string && request.resource.data.name.size() <= 120
+        && request.resource.data.get('section', '') is string && request.resource.data.get('section', '').size() <= 80
+        && request.resource.data.get('parentEmails', []) is list && request.resource.data.get('parentEmails', []).size() <= 6
+        && request.resource.data.time is number
+        && request.resource.data.time <= request.time.toMillis() + 300000
+        && request.resource.data.time >= request.time.toMillis() - 172800000
+        && (!('manual' in request.resource.data.keys())
+            || (request.resource.data.manual == true && request.resource.data.get('by', '') == request.auth.uid));
       allow update: if canManage()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['parentEmails', 'name', 'section']);
       allow delete: if false;
