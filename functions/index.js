@@ -1,6 +1,6 @@
 // Sends phone notifications to parents (Firebase Cloud Messaging).
 // Deploy with: firebase deploy --only functions   (needs the Blaze plan)
-const {onDocumentCreated, onDocumentUpdated} = require('firebase-functions/v2/firestore');
+const {onDocumentCreated, onDocumentUpdated, onDocumentWritten} = require('firebase-functions/v2/firestore');
 const {onSchedule} = require('firebase-functions/v2/scheduler');
 const {initializeApp} = require('firebase-admin/app');
 const {getFirestore} = require('firebase-admin/firestore');
@@ -156,4 +156,58 @@ exports.notifyReportAnswered = onDocumentUpdated('childReports/{id}', async even
     a.status === 'at_school' ? `${name} is confirmed at school` : `The school confirmed ${name} is not at school`,
     withNote(a.status === 'at_school' ? 'The teacher checked your report and your child is at school.' : 'The school has noted your report.', a.note),
     'rep-' + event.params.id);
+});
+
+// ---------------------------------------------------------------------------------------------
+// Light data for the TV (display.html), so it no longer downloads every child record and thousands of taps.
+//  display/<kidId>        name and section of every child who is not archived (mirrorDisplay)
+//  dailyStats/<yyyy-mm-dd> { last: { kidId: [type, time] } } the latest tap of each child that day (countTap)
+// rebuildDisplay fills both from scratch every morning. After the first deploy, run it once from
+// Google Cloud Console > Cloud Scheduler > "Force run" (job name starts with firebase-schedule-rebuildDisplay).
+// Until display has documents, the TV keeps using the old way, so nothing breaks while you set this up.
+// ---------------------------------------------------------------------------------------------
+exports.mirrorDisplay = onDocumentWritten('kids/{id}', async event => {
+  const db = getFirestore(), ref = db.doc('display/' + event.params.id);
+  const before = event.data && event.data.before, after = event.data && event.data.after;
+  if (!after || !after.exists || after.get('archived')) {
+    if (before && before.exists) await ref.delete();
+    return;
+  }
+  const name = after.get('name') || '', section = after.get('section') || '';
+  if (before && before.exists && !before.get('archived') && before.get('name') === after.get('name') && before.get('section') === after.get('section')) return;
+  await ref.set({name, section});
+});
+
+exports.countTap = onDocumentCreated('log/{id}', async event => {
+  const l = event.data && event.data.data();
+  if (!l || !l.kidId || typeof l.time !== 'number') return;
+  const db = getFirestore(), ref = db.doc('dailyStats/' + manilaNow(new Date(l.time)).iso);
+  await db.runTransaction(async tx => {
+    const snap = await tx.get(ref);
+    const cur = ((snap.exists && snap.get('last')) || {})[l.kidId];
+    if (cur && cur[1] >= l.time) return;   // an older tap that arrived late (offline sync) must not overwrite a newer one
+    tx.set(ref, {last: {[l.kidId]: [l.type, l.time]}}, {merge: true});
+  });
+});
+
+exports.rebuildDisplay = onSchedule({schedule: '30 4 * * *', timeZone: TZ, timeoutSeconds: 300}, async () => {
+  const db = getFirestore();
+  const kids = (await db.collection('kids').get()).docs.filter(d => !d.get('archived'));
+  const keep = new Set(kids.map(d => d.id));
+  const ops = kids.map(d => ({set: db.doc('display/' + d.id), data: {name: d.get('name') || '', section: d.get('section') || ''}}));
+  (await db.collection('display').get()).forEach(d => { if (!keep.has(d.id)) ops.push({del: d.ref}); });
+  for (let i = 0; i < ops.length; i += 400) {
+    const b = db.batch();
+    ops.slice(i, i + 400).forEach(o => o.del ? b.delete(o.del) : b.set(o.set, o.data));
+    await b.commit();
+  }
+  // Today's counters, rebuilt from the day's taps (covers taps made before the functions were deployed).
+  const t = manilaNow();
+  const last = {};
+  (await db.collection('log').where('time', '>=', t.start).get()).forEach(d => {
+    const l = d.data();
+    if (l.kidId && (!last[l.kidId] || last[l.kidId][1] < l.time)) last[l.kidId] = [l.type, l.time];
+  });
+  if (Object.keys(last).length) await db.doc('dailyStats/' + t.iso).set({last});
+  console.log('rebuildDisplay', kids.length, 'children,', Object.keys(last).length, 'with taps today');
 });
