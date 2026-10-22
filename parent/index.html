@@ -1,7 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<script>try{var t=localStorage.getItem("tapin-theme");if(t==="dark"||t==="light")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<script>
+// Date pickers: open the calendar when the field is tapped, not only the tiny icon.
+document.addEventListener('click',e=>{const t=e.target;if(!t||t.tagName!=='INPUT'||!/^(date|month|datetime-local|time)$/.test(t.type)||t.disabled||t.readOnly)return;try{t.showPicker&&t.showPicker()}catch(x){}});
+try{var t=localStorage.getItem("tapin-theme");if(t==="dark"||t==="light")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0a1d2c">
@@ -12,9 +15,9 @@
 <title>Tap-In Parents</title>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#eef4f6;--card:#fff;--ink:#16323a;--mute:#3f5a63;--line:#d5e3e7;--field:#9fbcc4;--acc:#f2b233;--acc-ink:#2a1d00;--sun:#f2b233;--focus:#0b5f8a;--link:#0b5f8a;--ok:#1f8f5f;--bad:#c2410c;--t-green:#17784d;--t-red:#c62828;--t-blue:#1e56b8;--t-amber:#9a5b00;--t-ink:#fff;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0a1d2c;--card:#112e40;--ink:#e8f1f5;--mute:#9bbac6;--line:#27495d;--field:#2f566b;--acc:#f2b233;--acc-ink:#2a1d00;--focus:#8fd8ee;--link:#7fd0e6;--ok:#4cc790;--bad:#f08a5d;--t-green:#4cc790;--t-red:#f27a7a;--t-blue:#6aa7ff;--t-amber:#f2b233;--t-ink:#062026}}
-:root[data-theme="dark"]{--bg:#0a1d2c;--card:#112e40;--ink:#e8f1f5;--mute:#9bbac6;--line:#27495d;--field:#2f566b;--acc:#f2b233;--acc-ink:#2a1d00;--focus:#8fd8ee;--link:#7fd0e6;--ok:#4cc790;--bad:#f08a5d;--t-green:#4cc790;--t-red:#f27a7a;--t-blue:#6aa7ff;--t-amber:#f2b233;--t-ink:#062026}
+:root{color-scheme:light;--bg:#eef4f6;--card:#fff;--ink:#16323a;--mute:#3f5a63;--line:#d5e3e7;--field:#9fbcc4;--acc:#f2b233;--acc-ink:#2a1d00;--sun:#f2b233;--focus:#0b5f8a;--link:#0b5f8a;--ok:#1f8f5f;--bad:#c2410c;--t-green:#17784d;--t-red:#c62828;--t-blue:#1e56b8;--t-amber:#9a5b00;--t-ink:#fff;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#0a1d2c;--card:#112e40;--ink:#e8f1f5;--mute:#9bbac6;--line:#27495d;--field:#2f566b;--acc:#f2b233;--acc-ink:#2a1d00;--focus:#8fd8ee;--link:#7fd0e6;--ok:#4cc790;--bad:#f08a5d;--t-green:#4cc790;--t-red:#f27a7a;--t-blue:#6aa7ff;--t-amber:#f2b233;--t-ink:#062026}}
+:root[data-theme="dark"]{color-scheme:dark;--bg:#0a1d2c;--card:#112e40;--ink:#e8f1f5;--mute:#9bbac6;--line:#27495d;--field:#2f566b;--acc:#f2b233;--acc-ink:#2a1d00;--focus:#8fd8ee;--link:#7fd0e6;--ok:#4cc790;--bad:#f08a5d;--t-green:#4cc790;--t-red:#f27a7a;--t-blue:#6aa7ff;--t-amber:#f2b233;--t-ink:#062026}
 @media (prefers-color-scheme:dark){:where(:root:not([data-theme="light"])) body{background-image:radial-gradient(110% 50% at 50% 0%,#14465e 0%,rgba(20,70,94,0) 65%);background-repeat:no-repeat;background-attachment:fixed}}
 :where(:root[data-theme="dark"]) body{background-image:radial-gradient(110% 50% at 50% 0%,#14465e 0%,rgba(20,70,94,0) 65%);background-repeat:no-repeat;background-attachment:fixed}
 *{box-sizing:border-box}
@@ -32,6 +35,14 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px soli
 .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:12px}
 .row{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap}
 label{display:block;font-size:1rem;color:var(--mute);margin:10px 0 3px}
+input[type="date"]{display:block;min-width:0;max-width:100%;-webkit-appearance:none;appearance:none;text-align:left}
+input[type="date"]::-webkit-date-and-time-value{text-align:left;min-width:0;margin:0}
+input[type="date"]::-webkit-datetime-edit{padding:0}
+input[type="date"],input[type="month"],input[type="datetime-local"]{cursor:pointer}
+input::-webkit-calendar-picker-indicator{cursor:pointer;opacity:.85;padding:6px;margin:0 -2px 0 4px;border-radius:8px}
+input::-webkit-calendar-picker-indicator:hover{opacity:1;background:color-mix(in srgb,var(--acc) 28%,transparent)}
+input[type="month"],input[type="datetime-local"]{-webkit-appearance:none;appearance:none;text-align:left;min-width:0;max-width:100%}
+input[type="date"]:invalid,input[type="datetime-local"]:invalid{border-color:var(--bad)}
 input,textarea{width:100%;padding:12px 10px;min-height:48px;border-radius:10px;border:1.5px solid var(--field,var(--line));background:var(--bg);color:var(--ink);font:inherit}
 .big{font-size:1.15rem;font-weight:600}
 .pill{font-size:.9rem;padding:3px 10px;border-radius:99px;background:var(--bg);color:var(--mute)}
