@@ -446,7 +446,7 @@ function start(){
   },()=>{}));
   unsubs.push(onSnapshot(collection(db,'kids'),s=>{
     kidIds=new Set();
-    s.docs.forEach(x=>{const d=x.data(),old=kidCache.get(x.id)||{};kidIds.add(x.id);kidCache.set(x.id,{photo:d.photo||old.photo||'',section:d.section||'',photoDone:!!(d.photo||old.photoDone)})});
+    s.docs.forEach(x=>{const d=x.data(),old=kidCache.get(x.id)||{};if(d.archived)return;kidIds.add(x.id);kidCache.set(x.id,{photo:d.photo||old.photo||'',section:d.section||'',photoDone:!!(d.photo||old.photoDone)})});
     renderStats();render();
   },()=>{}));
   unsubs.push(onSnapshot(query(collection(db,'visitors'),where('timeIn','>=',d0.getTime())),s=>{
