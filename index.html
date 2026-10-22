@@ -1505,10 +1505,12 @@ $('simBtn').onclick=async()=>{
 
 // --- Excel export (SheetJS is loaded only when someone taps an Excel button)
 let xlsxP=null;
-const loadXlsx=()=>window.XLSX?Promise.resolve(window.XLSX):(xlsxP=xlsxP||new Promise((ok,no)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';s.onload=()=>ok(window.XLSX);s.onerror=()=>{xlsxP=null;no(new Error('load'))};document.head.appendChild(s)}));
+const loadXlsx=()=>window.XLSX?Promise.resolve(window.XLSX):(xlsxP=xlsxP||new Promise((ok,no)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js';s.onload=()=>ok(window.XLSX);s.onerror=()=>{xlsxP=null;no(new Error('load'))};document.head.appendChild(s)}));
 async function saveXlsx(name,sheet,rows,more,opts){
   try{const X=await loadXlsx(),wb=X.utils.book_new();
-    [[sheet,rows,opts]].concat(more||[]).forEach(([sn,rw,op])=>{const ws=X.utils.aoa_to_sheet(rw);
+    [[sheet,rows,opts]].concat(more||[]).forEach(([sn,rw,op])=>{
+      if(op&&op.build){X.utils.book_append_sheet(wb,op.build(X),sn.slice(0,31));return}
+      const ws=X.utils.aoa_to_sheet(rw);
       const w=Math.max(...rw.slice(0,200).map(r=>r.length));
       ws['!cols']=op&&op.cols?op.cols:Array.from({length:w},(_,i)=>({wch:Math.min(40,Math.max(6,...rw.slice(0,200).map(r=>String(r[i]==null?'':r[i]).length))+2)}));
       if(op&&op.merges)ws['!merges']=op.merges;
@@ -1517,39 +1519,110 @@ async function saveXlsx(name,sheet,rows,more,opts){
 // The monthly SF2 laid out like the printed form: header block, one column per school day, Male / Female blocks with totals, summary, signatures.
 function sf2Sheet(){
   const L=sfLast,r=sfCalc(),WD=['S','M','T','W','TH','F','S'],val=i=>$(i).value;
-  const cols=r.days.filter(x=>x.wd>0),cd=r.days.filter(x=>x.cls),sd=cd.length;
+  const cols=r.days.filter(x=>x.wd>0),cd=r.days.filter(x=>x.cls),sd=cd.length,nd=cols.length;
   const mon=new Date(L.y,L.m-1,1).toLocaleString('en-PH',{month:'long',year:'numeric'}),monN=new Date(L.y,L.m-1,1).toLocaleString('en-PH',{month:'long'});
   const [grade,...rest]=(L.sec||'').split(' - '),section=rest.join(' - ');
-  const NC=cols.length+5,out=[['School Form 2 (SF2) Daily Attendance Report of Learners'],[],
-    ['School ID',val('sfId'),'','School Year',val('sfYear'),'','Report for the Month of',mon],
-    ['Name of School',val('sfSchool'),'','Grade Level',grade,'','Section',section],[]];
-  out.push(['No.',"LEARNER'S NAME (Last Name, First Name, Middle Name)"].concat(cols.map(x=>x.cls?x.d:''),['ABSENT','PRESENT','REMARKS']));
-  out.push(['',''].concat(cols.map(x=>WD[x.wd]),['','','']));
-  const grp={M:[],F:[],'':[]};r.rows.forEach(x=>grp[x.kid.sex==='M'||x.kid.sex==='F'?x.kid.sex:''].push(x));
-  const isP=m=>m==='P'||m==='T',pres=x=>x.marks.filter((m,i)=>r.days[i].cls&&isP(m)).length,tot={n:{},abs:{},pres:{},pd:{}};
-  const block=(k,label)=>{const g=grp[k];if(!g.length&&k==='')return;
-    g.forEach((x,i)=>out.push([i+1,x.kid.name||''].concat(cols.map(c=>{const m=x.marks[c.d-1];return m==='A'?'x':m==='T'?'T':''}),[x.abs,pres(x),x.streak>=5?'Absent 5+ days in a row':''])));
-    const pd=cols.map(c=>c.cls?g.filter(x=>isP(x.marks[c.d-1])).length:'');
-    const a=g.reduce((t,x)=>t+x.abs,0),p=g.reduce((t,x)=>t+pres(x),0);
-    out.push(['',label+' | TOTAL Per Day'].concat(pd,[a,p,'']));tot.n[k]=g.length;tot.abs[k]=a;tot.pres[k]=p;tot.pd[k]=pd};
-  block('M','MALE');block('F','FEMALE');block('','SEX NOT SET');
-  const ks=Object.keys(tot.n),sum=o=>ks.reduce((t,k)=>t+(o[k]||0),0);
-  out.push(['','Combined TOTAL PER DAY'].concat(cols.map((c,i)=>c.cls?ks.reduce((t,k)=>t+(+tot.pd[k][i]||0),0):''),[sum(tot.abs),sum(tot.pres),'']));
-  out.push([],['Legend: x = absent, T = late (after '+(val('sfCut')||'07:30')+'), blank = present']);
-  const eM=+val('sfEnrM')||tot.n.M||0,eF=+val('sfEnrF')||tot.n.F||0,eT=eM+eF+(tot.n['']||0),rM=tot.n.M||0,rF=tot.n.F||0,rT=sum(tot.n);
-  const nf=x=>+(+x).toFixed(2),pc=(a,b)=>b?nf(a/b*100):0,av=d=>sd?nf(d/sd):0,dM=tot.pres.M||0,dF=tot.pres.F||0,dT=sum(tot.pres);
-  const five=k=>(grp[k]||[]).filter(x=>x.streak>=5).length;
-  out.push([],['','Summary for '+monN,'Male','Female','TOTAL'],
-    ['','No. of days of classes',sd],
-    ['','Enrolment as of 1st Friday of the SY',eM,eF,eT],
-    ['','Registered learners as of end of month',rM,rF,rT],
-    ['','Percentage of enrolment as of end of month',pc(rM,eM),pc(rF,eF),pc(rT,eT)],
-    ['','Average daily attendance',av(dM),av(dF),av(dT)],
-    ['','Percentage of attendance for the month',pc(sd?dM/sd:0,rM),pc(sd?dF/sd:0,rF),pc(sd?dT/sd:0,rT)],
-    ['','Students absent for 5 consecutive days',five('M'),five('F'),five('M')+five('F')+five('')],
-    [],['','I certify that this is a true and correct report.'],['','Adviser: '+val('sfAdv')],['','Attested by (School Head): '+val('sfHead')]);
-  const cw=[{wch:5},{wch:38}].concat(cols.map(()=>({wch:4.5})),[{wch:9},{wch:9},{wch:26}]);
-  return {rows:out,opts:{cols:cw,merges:[{s:{r:0,c:0},e:{r:0,c:Math.min(NC-1,12)}}]}}}
+  const DC=2,EA=DC+nd,LAST=EA+2;
+  const build=X=>{
+    const ws={},mg=[],rh=[];let maxR=0;
+    const bl=t=>({style:t||'thin',color:{rgb:'000000'}});
+    const st=o=>{o=o||{};const s={font:Object.assign({name:'Arial',sz:9},o.font||{}),alignment:Object.assign({vertical:'center',horizontal:'center',wrapText:true},o.al||{})};
+      if(!o.nb)s.border={top:bl(),bottom:bl(),left:bl(),right:o.rb?bl('medium'):bl()};
+      if(o.fill)s.fill={patternType:'solid',fgColor:{rgb:o.fill}};return s};
+    const put=(rr,c,v,s)=>{ws[X.utils.encode_cell({r:rr,c})]={v:v==null?'':v,t:typeof v==='number'?'n':'s',s};if(rr>maxR)maxR=rr};
+    const box=(r1,c1,r2,c2,v,s)=>{for(let a=r1;a<=r2;a++)for(let b=c1;b<=c2;b++)put(a,b,a===r1&&b===c1?v:'',s);
+      if(r2>r1||c2>c1)mg.push({s:{r:r1,c:c1},e:{r:r2,c:c2}})};
+    const LBL=st({font:{b:true},al:{horizontal:'left'},fill:'F2F2F2'}),VAL=st({al:{horizontal:'left'}}),GRY='D9D9D9';
+    // Title
+    box(0,0,0,LAST,'School Form 2 (SF2) Daily Attendance Report of Learners',st({nb:true,font:{b:true,sz:14}}));rh[0]={hpt:24};
+    box(1,0,1,LAST,'(This replaces Form 1, Form 2 & STS Form 4 - Absenteeism and Dropout Profile)',st({nb:true,font:{i:true,sz:8}}));
+    // Header boxes
+    box(3,0,3,1,'School ID',LBL);box(3,2,3,5,val('sfId'),VAL);box(3,6,3,9,'School Year',LBL);box(3,10,3,13,val('sfYear'),VAL);
+    box(3,14,3,19,'Report for the Month of',LBL);box(3,20,3,25,mon,VAL);
+    box(4,0,4,1,'Name of School',LBL);box(4,2,4,9,val('sfSchool'),VAL);box(4,10,4,13,'Grade Level',LBL);box(4,14,4,17,grade,VAL);
+    box(4,18,4,19,'Section',LBL);box(4,20,4,25,section,VAL);rh[3]={hpt:20};rh[4]={hpt:20};
+    // Table header
+    const H=st({font:{b:true},fill:'E7E6E6'}),H0=5;
+    box(H0,0,H0+2,0,'No.',H);
+    box(H0,1,H0+2,1,"LEARNER'S NAME\n(Last Name, First Name, Middle Name)",H);
+    box(H0,DC,H0,EA-1,'(1st row for date)',st({font:{b:true,sz:8},fill:'E7E6E6'}));
+    cols.forEach((c,i)=>{const rb=c.wd===6;
+      put(H0+1,DC+i,c.cls?c.d:'',st({font:{b:true},fill:'E7E6E6',rb}));
+      put(H0+2,DC+i,WD[c.wd],st({font:{b:true,sz:8},fill:'E7E6E6',rb}))});
+    box(H0,EA,H0,EA+1,'Total for the Month',st({font:{b:true,sz:8},fill:'E7E6E6'}));
+    box(H0+1,EA,H0+2,EA,'ABSENT',H);box(H0+1,EA+1,H0+2,EA+1,'PRESENT',H);
+    box(H0,EA+2,H0+2,EA+2,'REMARKS (If DROPPED OUT, state reason, please refer to legend number 2. If TRANSFERRED IN/OUT, write the name of School.)',st({font:{b:true,sz:8},fill:'E7E6E6'}));
+    rh[H0]={hpt:18};rh[H0+2]={hpt:16};
+    // Data
+    let R=H0+3;
+    const grp={M:[],F:[],'':[]};r.rows.forEach(x=>grp[x.kid.sex==='M'||x.kid.sex==='F'?x.kid.sex:''].push(x));
+    const isP=m=>m==='P'||m==='T',pres=x=>x.marks.filter((m,i)=>r.days[i].cls&&isP(m)).length,tot={n:{},abs:{},pres:{},pd:{}};
+    const block=(k,label)=>{const g=grp[k];if(!g.length&&k==='')return;
+      g.forEach((x,i)=>{put(R,0,i+1,st());put(R,1,x.kid.name||'',st({al:{horizontal:'left',wrapText:false}}));
+        cols.forEach((c,j)=>{const m=x.marks[c.d-1],rb=c.wd===6;
+          put(R,DC+j,m==='A'?'x':m==='T'?'T':'',st({rb,font:m==='A'?{b:true}:{},fill:m==='T'?GRY:(c.cls?null:'F2F2F2')}))});
+        put(R,EA,x.abs,st());put(R,EA+1,pres(x),st());put(R,EA+2,x.streak>=5?'Absent 5+ days in a row':'',st({al:{horizontal:'left'},font:{sz:8}}));R++});
+      const pd=cols.map(c=>c.cls?g.filter(x=>isP(x.marks[c.d-1])).length:'');
+      const a=g.reduce((t,x)=>t+x.abs,0),p=g.reduce((t,x)=>t+pres(x),0),T=st({font:{b:true},fill:'F2F2F2'});
+      box(R,0,R,1,label+' | TOTAL Per Day',st({font:{b:true},fill:'F2F2F2',al:{horizontal:'right'}}));
+      cols.forEach((c,j)=>put(R,DC+j,pd[j],st({font:{b:true},fill:'F2F2F2',rb:c.wd===6})));
+      put(R,EA,a,T);put(R,EA+1,p,T);put(R,EA+2,'',T);R++;
+      tot.n[k]=g.length;tot.abs[k]=a;tot.pres[k]=p;tot.pd[k]=pd};
+    block('M','MALE');block('F','FEMALE');block('','SEX NOT SET');
+    const ks=Object.keys(tot.n),sum=o=>ks.reduce((t,k)=>t+(o[k]||0),0),T2=st({font:{b:true},fill:'D9D9D9'});
+    box(R,0,R,1,'Combined TOTAL PER DAY',st({font:{b:true},fill:'D9D9D9',al:{horizontal:'right'}}));
+    cols.forEach((c,j)=>put(R,DC+j,c.cls?ks.reduce((t,k)=>t+(+tot.pd[k][j]||0),0):'',st({font:{b:true},fill:'D9D9D9',rb:c.wd===6})));
+    put(R,EA,sum(tot.abs),T2);put(R,EA+1,sum(tot.pres),T2);put(R,EA+2,'',T2);R+=2;
+    // Guidelines
+    const W=Math.round(5+38+nd*4.5+9+9+26),TXT=st({nb:true,al:{horizontal:'left',vertical:'top'}});
+    const para=(txt,s)=>{box(R,0,R,LAST,txt,s||TXT);rh[R]={hpt:Math.max(13,Math.ceil(txt.length/(W*1.05))*12.5)};R++};
+    para('GUIDELINES:',st({nb:true,font:{b:true},al:{horizontal:'left'}}));
+    ['1. The attendance shall be accomplished daily. Refer to the codes for checking learners\' attendance.',
+     '2. Dates shall be written in the columns after the Learner\'s Name.',
+     '3. To compute the following:',
+     '     a. Percentage of Enrolment = (Registered Learners as of end of the month / Enrolment as of 1st Friday of the SY) x 100',
+     '     b. Average Daily Attendance = Total Daily Attendance / Number of School Days in reporting month',
+     '     c. Percentage of Attendance for the month = (Average daily attendance / Registered Learners as of end of the month) x 100',
+     '4. Every end of the month, the class adviser will submit this form to the office of the principal for recording of summary table into School Form 4. Once signed by the principal, this form should be returned to the adviser.',
+     '5. The adviser will provide necessary interventions including but not limited to home visitation to learner/s who were absent for 5 consecutive days and reports the action taken to the school head.',
+     '6. Attendance performance of learners will be reflected in Form 137 and Form 138 every grading period.'].forEach(t=>para(t));
+    R++;
+    para('CODES FOR CHECKING ATTENDANCE:',st({nb:true,font:{b:true},al:{horizontal:'left'}}));
+    para('Blank = Present     x = Absent     T = Late / Tardy (arrived after '+(val('sfCut')||'07:30')+', shaded gray; counted as present)');
+    para('Reason/Cause for NLS (No Longer in School): a. Domestic-related factors (a.1 Had to take care of siblings; a.2 Early marriage/pregnancy; a.3 Parents\' attitude toward schooling; a.4 Family problems). b. Individual-related factors (b.1 Illness; b.2 Overage; b.3 Death; b.4 Drug abuse; b.5 Poor academic performance; b.6 Lack of interest/distractions; b.7 Hunger/Malnutrition). c. School-related factors (c.1 Teacher factor; c.2 Physical condition of classroom; c.3 Peer influence). d. Geographic/Environmental (d.1 Distance between home and school; d.2 Armed conflict; d.3 Calamities/disasters). e. Financial-related (e.1 Child labor, work). f. Others (specify).',st({nb:true,al:{horizontal:'left',vertical:'top'},font:{sz:8}}));
+    R++;
+    // Summary
+    const eM=+val('sfEnrM')||tot.n.M||0,eF=+val('sfEnrF')||tot.n.F||0,eT=eM+eF+(tot.n['']||0),rM=tot.n.M||0,rF=tot.n.F||0,rT=sum(tot.n);
+    const nf=x=>+(+x).toFixed(2),pc=(a,b)=>b?nf(a/b*100):0,av=d=>sd?nf(d/sd):0,dM=tot.pres.M||0,dF=tot.pres.F||0,dT=sum(tot.pres);
+    const five=k=>(grp[k]||[]).filter(x=>x.streak>=5).length;
+    const SH=st({font:{b:true},fill:'E7E6E6'}),SL=st({al:{horizontal:'left'}});
+    box(R,0,R,1,'Summary for the month of '+monN,SH);box(R,2,R,5,'Male',SH);box(R,6,R,9,'Female',SH);box(R,10,R,13,'TOTAL',SH);R++;
+    const srow=(lab,m,f,t)=>{box(R,0,R,1,lab,SL);box(R,2,R,5,m,st());box(R,6,R,9,f,st());box(R,10,R,13,t,st());R++};
+    srow('No. of days of classes','','',sd);
+    srow('Enrolment as of 1st Friday of the SY',eM,eF,eT);
+    srow('Registered learners as of end of the month',rM,rF,rT);
+    srow('Percentage of enrolment as of end of the month',pc(rM,eM),pc(rF,eF),pc(rT,eT));
+    srow('Average daily attendance',av(dM),av(dF),av(dT));
+    srow('Percentage of attendance for the month',pc(sd?dM/sd:0,rM),pc(sd?dF/sd:0,rF),pc(sd?dT/sd:0,rT));
+    srow('Number of students absent for 5 consecutive days',five('M'),five('F'),five('M')+five('F')+five(''));
+    R++;
+    // Certification
+    para('I certify that this is a true and correct report.',st({nb:true,al:{horizontal:'left'}}));R++;
+    const sig=(c1,c2,name,cap)=>{box(R,c1,R,c2,name,st({nb:true,font:{b:true},al:{horizontal:'center'}}));
+      for(let b=c1;b<=c2;b++)ws[X.utils.encode_cell({r:R,c:b})].s.border={bottom:bl()};
+      box(R+1,c1,R+1,c2,cap,st({nb:true,font:{sz:8}}))};
+    rh[R]={hpt:22};
+    sig(0,10,val('sfAdv'),'(Signature of Teacher over Printed Name)');
+    sig(14,24,val('sfHead'),'(Signature of School Head over Printed Name)');
+    box(R-1,14,R-1,24,'Attested by:',st({nb:true,al:{horizontal:'left'}}));R+=2;
+    ws['!ref']=X.utils.encode_range({s:{r:0,c:0},e:{r:Math.max(maxR,R),c:LAST}});
+    ws['!merges']=mg;ws['!rows']=rh;
+    ws['!cols']=[{wch:5},{wch:38}].concat(cols.map(()=>({wch:4.5})),[{wch:9},{wch:9},{wch:26}]);
+    ws['!pageSetup']={orientation:'landscape',paperSize:5,fitToWidth:1,fitToHeight:0};
+    ws['!sheetPr']={pageSetUpPr:{fitToPage:true}};
+    ws['!margins']={left:.3,right:.3,top:.4,bottom:.4,header:.2,footer:.2};
+    return ws};
+  return {rows:[],opts:{build}}}
 $('logXlsx').onclick=()=>{
   const fl=logState.flags||{};
   saveXlsx('attendance-log','Log',[['Name','Section','Type','Time','Method','Flags']].concat([...logState.t].reverse().map(l=>[l.name||'',l.section||'',tl(l.type),new Date(l.time).toLocaleString('en-PH'),l.manual?'Manual':'Card',[(fl[l.id]||{}).late&&'Late',(fl[l.id]||{}).noout&&'No OUT'].filter(Boolean).join(' / ')]))) };
