@@ -1,6 +1,6 @@
 // Sends phone notifications to parents (Firebase Cloud Messaging).
 // Deploy with: firebase deploy --only functions   (needs the Blaze plan)
-const {onDocumentCreated} = require('firebase-functions/v2/firestore');
+const {onDocumentCreated, onDocumentUpdated} = require('firebase-functions/v2/firestore');
 const {onSchedule} = require('firebase-functions/v2/scheduler');
 const {initializeApp} = require('firebase-admin/app');
 const {getFirestore} = require('firebase-admin/firestore');
@@ -131,4 +131,29 @@ exports.weeklyBackup = onSchedule({schedule: '0 2 * * 0', timeZone: TZ, timeoutS
     collectionIds: []   // empty = every collection
   });
   console.log('Backup started', op.name, '->', `gs://${bucket}/firestore-backups/${stamp}`);
+});
+
+// ---------------------------------------------------------------------------------------------
+// Tell the parent when the school answers something they sent (pref "msg": on unless the parent turned it off).
+// ---------------------------------------------------------------------------------------------
+const withNote = (text, note) => note ? `${text} Note: ${String(note).slice(0, 120)}` : text;
+
+exports.notifyRequestAnswered = onDocumentUpdated('changeRequests/{id}', async event => {
+  const b = event.data.before.data(), a = event.data.after.data();
+  if (!a || !b || b.status === a.status || !['done', 'declined'].includes(a.status) || !a.parentEmail) return;
+  const name = a.kidName || 'your child';
+  await pushTo([a.parentEmail], 'msg',
+    a.status === 'done' ? `Change for ${name} was done` : `Change for ${name} was declined`,
+    withNote(a.status === 'done' ? 'The school made the change you asked for.' : 'The school could not make the change you asked for.', a.note),
+    'req-' + event.params.id);
+});
+
+exports.notifyReportAnswered = onDocumentUpdated('childReports/{id}', async event => {
+  const b = event.data.before.data(), a = event.data.after.data();
+  if (!a || !b || b.status === a.status || !['at_school', 'not_at_school'].includes(a.status) || !a.parentEmail) return;
+  const name = a.kidName || 'Your child';
+  await pushTo([a.parentEmail], 'msg',
+    a.status === 'at_school' ? `${name} is confirmed at school` : `The school confirmed ${name} is not at school`,
+    withNote(a.status === 'at_school' ? 'The teacher checked your report and your child is at school.' : 'The school has noted your report.', a.note),
+    'rep-' + event.params.id);
 });
