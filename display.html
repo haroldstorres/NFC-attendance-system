@@ -202,7 +202,7 @@ html[data-theme="light"] .stat{background:linear-gradient(135deg,color-mix(in sr
 <div class="spot" id="spot" aria-live="polite"><div class="spwrap n1" id="spWrap"></div></div>
 
 <script type="module">
-import {initializeAppCheck,ReCaptchaV3Provider} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app-check.js";
+import {initializeAppCheck,ReCaptchaEnterpriseProvider} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app-check.js";
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,signOut} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 import {getFirestore,collection,doc,getDoc,query,where,orderBy,limit,onSnapshot,getDocs} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
@@ -216,8 +216,8 @@ const firebaseConfig={
 // Own app name = own sign-in session, so the TV account never mixes with the staff app's login in the same browser.
 const app=initializeApp(firebaseConfig,'tvdisplay'),auth=getAuth(app);
 // App Check: only this real website can talk to Firebase. Paste your reCAPTCHA v3 site key to turn it on (see the notes).
-const APPCHECK_SITE_KEY="";
-if(APPCHECK_SITE_KEY){try{if(location.hostname==="localhost")self.FIREBASE_APPCHECK_DEBUG_TOKEN=true;initializeAppCheck(app,{provider:new ReCaptchaV3Provider(APPCHECK_SITE_KEY),isTokenAutoRefreshEnabled:true})}catch(e){console.warn("App Check did not start",e)}}
+const APPCHECK_SITE_KEY="6Ldh9votAAAAAFuMGdovaafha7pdhZev_FRB8_-L";
+if(APPCHECK_SITE_KEY){try{if(location.hostname==="localhost")self.FIREBASE_APPCHECK_DEBUG_TOKEN=true;initializeAppCheck(app,{provider:new ReCaptchaEnterpriseProvider(APPCHECK_SITE_KEY),isTokenAutoRefreshEnabled:true})}catch(e){console.warn("App Check did not start",e)}}
 const db=getFirestore(app);
 
 const $=id=>document.getElementById(id);
