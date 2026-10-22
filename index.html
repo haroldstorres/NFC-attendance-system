@@ -646,6 +646,7 @@ body.is-login #toast{background:#fff;color:#16323a;box-shadow:0 6px 20px rgba(0,
     <button type="button" role="tab" aria-selected="false" data-sp="rules">Tap rules</button>
     <button type="button" role="tab" aria-selected="false" data-sp="sec" id="spSecBtn" hidden>Grades &amp; sections</button>
     <button type="button" role="tab" aria-selected="false" data-sp="hol" id="spHolBtn" hidden>Holidays</button>
+    <button type="button" role="tab" aria-selected="false" data-sp="year" id="spYearBtn" hidden>Year-end</button>
   </div>
   <div class="spanel" id="sp-prof">
   <div class="card">
@@ -708,6 +709,17 @@ body.is-login #toast{background:#fff;color:#16323a;box-shadow:0 6px 20px rgba(0,
       </div>
     </div>
     <div id="holList"></div>
+  </div>
+  <div class="spanel" id="sp-year" hidden>
+    <div class="card">
+      <strong>End of school year</strong>
+      <p class="note">Moves children up to the next grade (same section name) and archives the ones who graduate or leave. Do this once, after the last SF2 of the year is printed or saved: reports use each child's current section, so old months will show the new sections afterwards. Teachers keep their sections, so check the Staff tab for any new section that needs an adviser.</p>
+      <div id="yeRows"></div>
+      <p class="note" id="yeSum"></p>
+      <p class="row"><button class="btn" id="yeGo" type="button">Review and apply</button></p>
+      <p class="note" id="yeResume" hidden>An earlier year-end change did not finish. <button class="btn alt sm" id="yeResumeBtn" type="button">Continue it</button> <button class="btn alt sm" id="yeDropBtn" type="button">Cancel it</button></p>
+    </div>
+    <details class="card" id="yeArch"><summary><strong id="yeArchHead">Archived children</strong></summary><div id="yeArchList"></div></details>
   </div>
 </section>
 
@@ -945,7 +957,7 @@ onAuthStateChanged(auth,async user=>{
   if(user){let ok=false;try{const sd=await getDoc(doc(db,'staff',user.uid));ok=sd.exists();if(ok){myRole=sd.data().role||'staff';mySecs=sd.data().sections||[];myName=sd.data().name||''}admin=ok&&myRole==='admin'}catch(e){}
     if(ok&&myRole==='display'){$('loginMsg').textContent='This account is for the TV screen. Open display.html on the TV instead.';signOut(auth);return}
     if(!ok){$('loginMsg').textContent='This account is not a staff account. Check the staff document in Firestore: its Document ID must be the User UID of this account.';signOut(auth);return}$('loginMsg').textContent=''}
-  $('login').hidden=!!user;document.body.classList.toggle('is-login',!user);$('app').hidden=!user;$('nav').hidden=!user;$('outBtn').hidden=!user;$('pwBtn').hidden=!user;if(!user)$('pwCard').hidden=true;$('navStaff').hidden=!admin;$('spSecBtn').hidden=!admin;$('spHolBtn').hidden=!admin;$('migBox').hidden=!admin;$('parentBox').hidden=!admin;setSp('prof');$('navAnnounce').hidden=!admin;$('navTv').hidden=!admin;
+  $('login').hidden=!!user;document.body.classList.toggle('is-login',!user);$('app').hidden=!user;$('nav').hidden=!user;$('outBtn').hidden=!user;$('pwBtn').hidden=!user;if(!user)$('pwCard').hidden=true;$('navStaff').hidden=!admin;$('spSecBtn').hidden=!admin;$('spHolBtn').hidden=!admin;$('spYearBtn').hidden=!admin;$('migBox').hidden=!admin;$('parentBox').hidden=!admin;setSp('prof');$('navAnnounce').hidden=!admin;$('navTv').hidden=!admin;
   if(!user)return;
   const vis={dashboard:myRole==='admin'||myRole==='head',myclass:myRole==='adviser',tap:myRole!=='adviser'&&myRole!=='head',kids:myRole==='admin'||myRole==='staff',requests:myRole==='admin'||myRole==='staff',log:true,inside:true,visitors:myRole!=='adviser',sf2:myRole!=='gate',school:myRole!=='gate'};
   Object.entries(vis).forEach(([t,v])=>document.querySelector('nav [data-tab='+t+']').hidden=!v);
@@ -961,8 +973,8 @@ onAuthStateChanged(auth,async user=>{
   const adv=myRole==='adviser';
   if(adv&&!mySecs.length){kids=[];logs=[];render()}
   else{const sf=adv?[where('section','in',mySecs)]:[];
-  unsub.push(onSnapshot(adv?query(collection(db,'kids'),...sf):collection(db,'kids'),s=>{kidsRaw=s.docs.map(d=>({id:d.id,...d.data()}));kids=kidsRaw.map(withPh);render();if(myRole==='admin'&&staffList.length)renderStaff()},()=>toast('Could not load the list of children.')));
-  unsub.push(onSnapshot(adv?query(collection(db,'kidPhotos'),...sf):collection(db,'kidPhotos'),s=>{photoMap={};s.docs.forEach(d=>{photoMap[d.id]=d.data().photo||''});kids=kidsRaw.map(withPh);render()},()=>{}));
+  unsub.push(onSnapshot(adv?query(collection(db,'kids'),...sf):collection(db,'kids'),s=>{kidsRaw=s.docs.map(d=>({id:d.id,...d.data()}));kids=kidsRaw.filter(k=>!k.archived).map(withPh);render();if(myRole==='admin'&&staffList.length)renderStaff()},()=>toast('Could not load the list of children.')));
+  unsub.push(onSnapshot(adv?query(collection(db,'kidPhotos'),...sf):collection(db,'kidPhotos'),s=>{photoMap={};s.docs.forEach(d=>{photoMap[d.id]=d.data().photo||''});kids=kidsRaw.filter(k=>!k.archived).map(withPh);render()},()=>{}));
   unsub.push(onSnapshot(query(collection(db,'log'),...sf,where('time','>=',start.getTime()),orderBy('time')),{includeMetadataChanges:true},s=>{logs=s.docs.map(d=>({id:d.id,...d.data(),_pending:d.metadata.hasPendingWrites}));logsLoaded=true;render()},()=>toast('Could not load the log. A Firestore index may be needed: open the browser console (F12) and click the link.')))}
   if(admin)unsub.push(onSnapshot(query(collection(db,'broadcasts'),orderBy('time','desc')),s=>{bcList=s.docs.slice(0,10).map(d=>({id:d.id,...d.data()}));renderBc()},()=>toast('Could not load past broadcasts.')));
   if(adv&&mySecs.length){const n=new Date();
@@ -1258,7 +1270,7 @@ document.addEventListener('click',e=>{
   wp.catch(err=>addFailed(f.entry,err&&err.code));
   toast('Sending the tap again...')});
 window.addEventListener('online',renderOffline);window.addEventListener('offline',renderOffline);
-function render(){renderOffline();fillSec();renderSecs();renderInside();renderMyClass();renderDashboard();
+function render(){renderOffline();fillSec();renderSecs();renderYear();renderInside();renderMyClass();renderDashboard();
   fillSim();
   fillKidFilter();const kview=viewKids();
   $('kidList').innerHTML=kids.length?(kview.length?kview.map(k=>k._h?`<div class="day">${esc(k._h)}</div>`:kTile(k)).join(''):'<p class="note">No children match this filter.</p>'):'<p class="note">No children yet. Tap "+ Add child" above.</p>';
@@ -1537,6 +1549,94 @@ $('migPhotos').onclick=async()=>{
     toast('Done. '+n+' photos moved.')}
   catch(e){toast('Stopped after '+n+' photos ('+(e.code||e.message)+'). Press the button again to continue.')}
   $('migPhotos').disabled=false};
+// --- End of school year: move children up a grade and archive the ones who graduate or leave (Manage > School > Year-end)
+// YEAREND-CORE-START
+const secSplit=n=>{const a=String(n||'').split(' - ');return [a[0],a.slice(1).join(' - ')]};
+const gradeNum=g=>{const m=/(\d+)/.exec(g||'');return m?+m[1]:null};
+const nextGrade=g=>gradeNum(g)===null?'':String(g).replace(/\d+/,String(gradeNum(g)+1));
+// Default for each grade: move up one; the highest numbered grade graduates; a name without a number is kept as is.
+function yearEndDefaults(grades){
+  const nums=grades.map(gradeNum).filter(x=>x!==null),top=nums.length?Math.max(...nums):null,out={};
+  grades.forEach(g=>{const n=gradeNum(g);out[g]=n===null?'keep':n===top?'grad':'up'});return out}
+// act: {grade: 'keep'|'up'|'grad'|'left'}. Every child is placed from the list as it is now, so grades never chain into each other.
+function yearEndPlan(kidList,secNames,act){
+  const canon=new Map(secNames.map(s=>[s.toLowerCase(),s])),moves=[],archive=[],newSecs=new Map();
+  kidList.forEach(k=>{
+    if(k.archived||!k.section)return;
+    const [g,sc]=secSplit(k.section),a=act[g]||'keep';
+    if(a==='keep')return;
+    if(a==='grad'||a==='left'){archive.push({t:'a',id:k.id,name:k.name,from:k.section,reason:a==='grad'?'graduated':'left'});return}
+    const ng=nextGrade(g);if(!ng)return;
+    const want=sc?ng+' - '+sc:ng,to=canon.get(want.toLowerCase())||newSecs.get(want.toLowerCase())||want;
+    if(!canon.has(want.toLowerCase()))newSecs.set(want.toLowerCase(),to);
+    moves.push({t:'m',id:k.id,name:k.name,from:k.section,to});
+  });
+  return {moves,archive,newSecs:[...newSecs.values()]};
+}
+// YEAREND-CORE-END
+let yeAct={};
+const YE_KEY='tapin-yearend-run';
+const yeSave=r=>{try{r&&r.length?localStorage.setItem(YE_KEY,JSON.stringify(r)):localStorage.removeItem(YE_KEY)}catch(e){}};
+const yeLoad=()=>{try{const v=JSON.parse(localStorage.getItem(YE_KEY)||'[]');return Array.isArray(v)?v:[]}catch(e){return[]}};
+const yeGrades=()=>[...new Set([...secList.map(x=>x.name),...kids.map(k=>k.section)].filter(Boolean).map(n=>secSplit(n)[0]))].sort(cmp);
+function renderYear(){
+  const rows=$('yeRows');if(!rows||myRole!=='admin')return;
+  const grades=yeGrades(),def=yearEndDefaults(grades);
+  Object.keys(yeAct).forEach(g=>{if(!grades.includes(g))delete yeAct[g]});
+  grades.forEach(g=>{if(!(g in yeAct))yeAct[g]=def[g]});
+  const o=(v,t,cur)=>`<option value="${v}"${cur===v?' selected':''}>${esc(t)}</option>`;
+  const h=grades.length?grades.map(g=>{const n=kids.filter(k=>secSplit(k.section)[0]===g).length,ng=nextGrade(g);
+    return `<div class="row" style="margin:8px 0"><span><strong>${esc(g)}</strong><div class="note">${n} ${n===1?'child':'children'}</div></span><select data-yg="${esc(g)}" aria-label="What happens to ${esc(g)}">${o('keep','Keep in '+g,yeAct[g])}${ng?o('up','Move up to '+ng,yeAct[g]):''}${o('grad','Archive: graduated',yeAct[g])}${o('left','Archive: left school',yeAct[g])}</select></div>`}).join(''):'<p class="note">No grades yet.</p>';
+  if(rows.dataset.h!==h){rows.innerHTML=h;rows.dataset.h=h}
+  const p=yearEndPlan(kids,secList.map(x=>x.name),yeAct);
+  $('yeSum').textContent=`${p.moves.length} to move up, ${p.archive.length} to archive, ${p.newSecs.length} new ${p.newSecs.length===1?'section':'sections'} to create.`;
+  $('yeGo').disabled=!p.moves.length&&!p.archive.length;
+  $('yeResume').hidden=!yeLoad().length;
+  const ar=kidsRaw.filter(k=>k.archived).sort((a,b)=>cmp(a.name||'',b.name||''));
+  $('yeArchHead').textContent='Archived children ('+ar.length+')';
+  const ah=ar.length?ar.map(k=>`<div class="row" style="margin:8px 0"><span><strong>${esc(k.name||'')}</strong><div class="note">${esc(k.archivedFrom||'')} · ${k.archivedReason==='left'?'Left school':'Graduated'}${k.archivedYear?' · '+esc(k.archivedYear):''}</div></span><button class="btn alt sm" data-yr="${esc(k.id)}" type="button">Restore</button></div>`).join(''):'<p class="note">No archived children.</p>';
+  const al=$('yeArchList');if(al.dataset.h!==ah){al.innerHTML=ah;al.dataset.h=ah}
+}
+$('yeRows').addEventListener('change',e=>{const s=e.target.closest('[data-yg]');if(!s)return;yeAct[s.dataset.yg]=s.value;renderYear()});
+async function yeRun(ops){
+  const when=Date.now(),yr=($('sfYear').value||'').trim();let done=0;
+  $('yeGo').disabled=true;
+  try{
+    const want=[...new Set(ops.filter(o=>o.t==='m').map(o=>o.to))].filter(n=>!secList.some(s=>s.name.toLowerCase()===n.toLowerCase()));
+    for(const name of want)await addDoc(collection(db,'sections'),{name});
+    for(let i=0;i<ops.length;i+=150){
+      const part=ops.slice(i,i+150),b=writeBatch(db);
+      part.forEach(o=>{
+        if(o.t==='m'){b.update(doc(db,'kids',o.id),{section:o.to});if(o.id in photoMap)b.update(doc(db,'kidPhotos',o.id),{section:o.to})}
+        else b.update(doc(db,'kids',o.id),{archived:true,archivedAt:when,archivedReason:o.reason,archivedFrom:o.from,archivedYear:yr})});
+      await b.commit();done+=part.length;yeSave(ops.slice(done));toast('Done '+done+' of '+ops.length+'...')}
+    toast('Finished. '+ops.length+' children updated. Now change the school year in School profile.')}
+  catch(e){toast('Stopped after '+done+' of '+ops.length+' ('+(e.code||e.message)+'). Press "Continue it" to finish.')}
+  renderYear()}
+$('yeGo').onclick=async()=>{
+  if(!navigator.onLine){toast('Connect to the internet first.');return}
+  if(yeLoad().length){toast('Finish or cancel the earlier year-end change first.');return}
+  const p=yearEndPlan(kids,secList.map(x=>x.name),yeAct),ops=[...p.moves,...p.archive];
+  if(!ops.length){toast('Nothing to change.');return}
+  const msg=`${p.moves.length} children move up a grade.\n${p.archive.length} children are archived.\n${p.newSecs.length} new sections are created.\n\nHave the SF2 reports for this school year been printed or saved? Archived children can be restored, but children who moved up must be moved back by hand.`;
+  if(!(await ask(msg,{title:'End of school year',ok:'Apply'})))return;
+  const keep=ops.map(o=>o.t==='m'?{t:'m',id:o.id,to:o.to}:{t:'a',id:o.id,from:o.from,reason:o.reason});
+  yeSave(keep);await yeRun(keep)};
+$('yeResumeBtn').onclick=async()=>{if(!navigator.onLine){toast('Connect to the internet first.');return}const r=yeLoad();if(r.length)await yeRun(r)};
+$('yeDropBtn').onclick=async()=>{if(await ask('Cancel the unfinished change? Children already moved stay where they are.',{title:'Cancel',ok:'Cancel it',danger:true})){yeSave([]);renderYear()}};
+$('yeArchList').addEventListener('click',async e=>{const b=e.target.closest('[data-yr]');if(!b)return;
+  const k=kidsRaw.find(x=>x.id===b.dataset.yr);if(!k)return;
+  const to=k.archivedFrom||k.section||'';
+  if(!(await ask('Restore '+(k.name||'this child')+(to?' to '+to:'')+'?',{title:'Restore',ok:'Restore'})))return;
+  try{
+    if(to&&!secList.some(s=>s.name.toLowerCase()===to.toLowerCase()))await addDoc(collection(db,'sections'),{name:to});
+    const u={archived:deleteField(),archivedAt:deleteField(),archivedReason:deleteField(),archivedFrom:deleteField(),archivedYear:deleteField()};
+    if(to)u.section=to;
+    if(k.uid&&kids.some(o=>o.uid===k.uid))u.uid=deleteField(); // the card now belongs to someone else
+    await updateDoc(doc(db,'kids',k.id),u);
+    if(to&&k.id in photoMap)await updateDoc(doc(db,'kidPhotos',k.id),{section:to}).catch(()=>{});
+    toast('Restored')}
+  catch(x){toast('Could not restore ('+(x.code||x.message)+')')}});
 // --- Import children from CSV
 const IMPH={last:['last','lastname','surname','familyname','apelyido'],first:['first','firstname','givenname','pangalan'],mid:['middle','middlename','mi','middleinitial'],name:['name','fullname','learnername','learnersname'],
   sex:['sex','gender','kasarian'],grade:['grade','gradelevel','level','year'],section:['section','sec'],lrn:['lrn','learnerreferencenumber'],bday:['birthdate','birthday','dob','dateofbirth'],
