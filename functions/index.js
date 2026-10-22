@@ -92,7 +92,7 @@ exports.autoNotArrived = onSchedule({schedule: '*/10 6-11 * * 1-5', timeZone: TZ
   if ((await marker.get()).exists) return;
   if ((await db.doc('holidays/' + t.iso).get()).exists) { await marker.set({skipped: 'holiday', time: Date.now()}); return; }
 
-  const kids = (await db.collection('kids').get()).docs;
+  const kids = (await db.collection('kids').get()).docs.filter(d => !d.get('archived'));
   const taps = (await db.collection('log').where('time', '>=', t.start).get()).docs.map(d => d.data());
   const arrived = new Set(taps.filter(l => l.type === 'in' || l.type === 'back').map(l => l.kidId));
   const seen = new Set(taps.map(l => l.kidId));
