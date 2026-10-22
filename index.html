@@ -714,7 +714,7 @@ body.is-login #toast{background:#fff;color:#16323a;box-shadow:0 6px 20px rgba(0,
   <div class="spanel" id="sp-year" hidden>
     <div class="card">
       <strong>End of school year</strong>
-      <p class="note">Moves children up to the next grade (same section name) and archives the ones who graduate or leave. Do this once, after the last SF2 of the year is printed or saved: reports use each child's current section, so old months will show the new sections afterwards. Teachers keep their sections, so check the Staff tab for any new section that needs an adviser.</p>
+      <p class="note">Moves children up to the next grade (same section name) and archives the ones who graduate or leave. Do this once, at the end of the school year. The app remembers each child's old section, so SF2 and the monthly report of earlier months still show the old grade and section (this works for children moved from now on; admins and the school head see the full old class list). Teachers keep their sections, so check the Staff tab for any new section that needs an adviser.</p>
       <div id="yeRows"></div>
       <p class="note" id="yeSum"></p>
       <p class="row"><button class="btn" id="yeGo" type="button">Review and apply</button></p>
@@ -1545,6 +1545,11 @@ function buildSF2(ks,lg,o){
     marks.forEach((m,i)=>{if(!days[i].cls)return;if(m==='A'){abs++;run++;best=Math.max(best,run)}else{run=0;if(m==='T')tar++}});
     return {kid:k,marks,abs,tar,streak:best}});
   return {n,days,schoolDays:days.filter(x=>x.cls).length,rows}}
+// Which section a child was in at a given time. sectionHistory = [{section, until}] means "was in <section> until <time>"
+// (written when children are moved up at year-end or restored). With no history, it is the current section.
+function sectionOn(k,t){const h=(k.sectionHistory||[]).slice().sort((a,b)=>a.until-b.until);
+  for(const e of h)if(t<e.until)return e.section||'';
+  return k.section||''}
 // SF2-CORE-END
 
 // --- No-class days (Manage > School > Holidays)
@@ -1636,7 +1641,8 @@ async function yeRun(ops){
     for(let i=0;i<ops.length;i+=150){
       const part=ops.slice(i,i+150),b=writeBatch(db);
       part.forEach(o=>{
-        if(o.t==='m'){b.update(doc(db,'kids',o.id),{section:o.to});if(o.id in photoMap)b.update(doc(db,'kidPhotos',o.id),{section:o.to})}
+        if(o.t==='m'){const kr=kidsRaw.find(x=>x.id===o.id)||{},fromSec=o.from||kr.section||'';
+          b.update(doc(db,'kids',o.id),{section:o.to,sectionHistory:fromSec?(kr.sectionHistory||[]).concat([{section:fromSec,until:when}]).slice(-8):(kr.sectionHistory||[])});if(o.id in photoMap)b.update(doc(db,'kidPhotos',o.id),{section:o.to})}
         else b.update(doc(db,'kids',o.id),{archived:true,archivedAt:when,archivedReason:o.reason,archivedFrom:o.from,archivedYear:yr})});
       await b.commit();done+=part.length;yeSave(ops.slice(done));toast('Done '+done+' of '+ops.length+'...')}
     toast('Finished. '+ops.length+' children updated. Now change the school year in School profile.')}
@@ -1649,7 +1655,7 @@ $('yeGo').onclick=async()=>{
   if(!ops.length){toast('Nothing to change.');return}
   const msg=`${p.moves.length} children move up a grade.\n${p.archive.length} children are archived.\n${p.newSecs.length} new sections are created.\n\nHave the SF2 reports for this school year been printed or saved? Archived children can be restored, but children who moved up must be moved back by hand.`;
   if(!(await ask(msg,{title:'End of school year',ok:'Apply'})))return;
-  const keep=ops.map(o=>o.t==='m'?{t:'m',id:o.id,to:o.to}:{t:'a',id:o.id,from:o.from,reason:o.reason});
+  const keep=ops.map(o=>o.t==='m'?{t:'m',id:o.id,from:o.from,to:o.to}:{t:'a',id:o.id,from:o.from,reason:o.reason});
   yeSave(keep);await yeRun(keep)};
 $('yeResumeBtn').onclick=async()=>{if(!navigator.onLine){toast('Connect to the internet first.');return}const r=yeLoad();if(r.length)await yeRun(r)};
 $('yeDropBtn').onclick=async()=>{if(await ask('Cancel the unfinished change? Children already moved stay where they are.',{title:'Cancel',ok:'Cancel it',danger:true})){yeSave([]);renderYear()}};
@@ -1669,6 +1675,7 @@ $('yeArchList').addEventListener('click',async e=>{const b=e.target.closest('[da
     // From today on, days with no tap count as absent. Days before this (while the child was away) stay blank in the reports.
     {const t0=new Date();t0.setHours(0,0,0,0);u.activeFrom=t0.getTime()}
     // Keep a short history so the record still says where the child was before (shown in the child's details).
+    if(from)u.sectionHistory=(k.sectionHistory||[]).concat([{section:from,until:k.archivedAt||Date.now()}]).slice(-8);
     u.enrolHistory=(k.enrolHistory||[]).concat([{from,reason:k.archivedReason||'left',year:k.archivedYear||'',left:k.archivedAt||0,back:Date.now(),to:to||''}]).slice(-10);
     if(k.uid&&kids.some(o=>o.uid===k.uid))u.uid=deleteField(); // the card now belongs to someone else
     await updateDoc(doc(db,'kids',k.id),u);
@@ -1781,7 +1788,7 @@ $('sfGo').onclick=async()=>{
   let adj=[];try{const ac=[where('month','==',y+'-'+m)];if(myRole==='adviser')ac.push(where('section','in',sec?[sec]:mySecs));
     adj=(await getDocs(query(collection(db,'adjustments'),...ac))).docs.map(d=>({id:d.id,...d.data()}))}
   catch(e){toast('Could not load edits ('+(e.code||e.message)+'). Have the rules for "adjustments" been published?')}
-  sfLast={y,m,sec,key:y+'-'+m,adj,lg:snap.docs.map(d=>d.data()),ks:kids.filter(k=>!sec||k.section===sec).sort((a,b)=>a.name.localeCompare(b.name))};
+  sfLast={y,m,sec,key:y+'-'+m,adj,lg:snap.docs.map(d=>d.data()),ks:kids.map(k=>({...k,section:sectionOn(k,new Date(y,m-1,15).getTime())})).filter(k=>!sec||k.section===sec).sort((a,b)=>a.name.localeCompare(b.name))};
   drawSF2()};
 function adjMap(L){const m={};(L.adj||[]).forEach(a=>{if(a.status==='P'||a.status==='A'||a.status==='T')m[a.kidId+'|'+a.day]=a.status});return m}
 function sfCalc(){const L=sfLast;return buildSF2(L.ks,L.lg,{year:L.y,month:L.m-1,cutoff:$('sfCut').value||'07:30',today:new Date(),holidays:holidayMap,overrides:sfOv[L.key],adj:adjMap(L)})}
@@ -2086,7 +2093,7 @@ $('sfSum').onclick=async()=>{
   catch(e){toast(e.code==='failed-precondition'?'A Firestore index is needed. Open the browser console (F12) and click the link.':'Could not load the log ('+(e.code||e.message)+').');return}
   await Promise.all(Object.keys(bk).map(async key=>{const ac=[where('month','==',key)];if(myRole==='adviser')ac.push(where('section','in',secs));
     try{adjs[key]=(await getDocs(query(collection(db,'adjustments'),...ac))).docs.map(d=>({id:d.id,...d.data()}))}catch(e){adjs[key]=[]}}));
-  const ks=kids.filter(k=>!sec||k.section===sec).sort((x,y)=>x.name.localeCompare(y.name)),rows=ks.map(k=>({kid:k,att:Array(12).fill(0),ab:Array(12).fill(0)}));
+  const ks=kids.map(k=>({...k,section:sectionOn(k,new Date(a,7,15).getTime())})).filter(k=>!sec||k.section===sec).sort((x,y)=>x.name.localeCompare(y.name)),rows=ks.map(k=>({kid:k,att:Array(12).fill(0),ab:Array(12).fill(0)}));
   SFMN.forEach((m,i)=>{const y=m>=7?a:b,key=y+'-'+m,lg=bk[key]||[];if(!lg.length)return;
     const r=buildSF2(ks,lg,{year:y,month:m-1,cutoff:$('sfCut').value||'07:30',today:new Date(),holidays:holidayMap,overrides:sfOv[key],adj:adjMap({adj:adjs[key]||[]})});
     r.rows.forEach((x,j)=>{let p=0;x.marks.forEach((mk,di)=>{if(r.days[di].cls&&(mk==='P'||mk==='T'))p++});rows[j].att[i]=p;rows[j].ab[i]=x.abs})});
