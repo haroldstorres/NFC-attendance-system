@@ -189,6 +189,65 @@ body.is-login #toast{background:#fff;color:#16323a;box-shadow:0 6px 20px rgba(0,
 .pav[style*="--h:"],.kt .ph[style*="--h:"]{background:linear-gradient(135deg,hsl(var(--h) 60% 28%),hsl(calc(var(--h) + 30) 60% 22%));color:#fff}
 .kt[style*="--h:"] .nm{border-top:4px solid hsl(var(--h) 70% 50%)}
 </style>
+<script>
+// Date fields shown as three boxes (Month, Day, Year) instead of the browser's calendar popup.
+// The original <input> stays (hidden) so the rest of the code keeps reading and setting .value as before.
+(function(){
+var MN=['January','February','March','April','May','June','July','August','September','October','November','December'],
+  pad=function(n){return String(n).padStart(2,'0')},NS=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value'),
+  SEL='input[type="date"],input[type="month"],input[type="datetime-local"]';
+var st=document.createElement('style');
+st.textContent='.dpick{display:flex;flex-wrap:wrap;gap:6px;flex:1;min-width:0;width:100%}.dpick select{width:auto;min-width:0;flex:1 1 0;min-height:48px;padding:10px 4px 10px 8px;border-radius:10px;border:1.5px solid var(--field,var(--line));background:var(--bg);color:var(--ink);font:inherit;text-overflow:ellipsis}.dpick .dm{flex:1.7 1 0}.dpick .dd{flex:.9 1 0}.dpick .dy{flex:1.2 1 0}.dpick .dtr{flex:1 1 100%;display:flex;gap:6px;align-items:center}.dpick .dtr span{color:var(--mute)}.dpick select:focus-visible{outline:3px solid var(--focus);outline-offset:2px}';
+document.head.appendChild(st);
+function enhance(inp){
+  if(inp._dp)return;inp._dp=1;
+  var kind=inp.type,hasDay=kind!=='month',hasTime=kind==='datetime-local',short=!!inp.closest('.lgdate,.dn,.sr'),now=new Date();
+  var g=document.createElement('div');g.className='dpick';g.setAttribute('role','group');
+  var lab=inp.getAttribute('aria-label')||(inp.labels&&inp.labels[0]?inp.labels[0].textContent:'Date');g.setAttribute('aria-label',lab);
+  function mk(cls,label){var s=document.createElement('select');s.className=cls;s.setAttribute('aria-label',label);return s}
+  function op(s,v,t){var o=document.createElement('option');o.value=v;o.textContent=t;s.appendChild(o)}
+  var sm=mk('dm','Month'),sd=hasDay?mk('dd','Day'):null,sy=mk('dy','Year'),sh,smi,sap;
+  op(sm,'','Month');MN.forEach(function(m,i){op(sm,String(i+1),short?m.slice(0,3):m)});
+  g.appendChild(sm);if(sd)g.appendChild(sd);g.appendChild(sy);
+  if(hasTime){var row=document.createElement('div');row.className='dtr';sh=mk('dh','Hour');smi=mk('dn','Minute');sap=mk('da','AM or PM');
+    for(var h=1;h<=12;h++)op(sh,String(h),String(h));for(var m=0;m<60;m+=5)op(smi,pad(m),pad(m));op(sap,'AM','AM');op(sap,'PM','PM');
+    sh.value='5';smi.value='00';sap.value='PM';var c=document.createElement('span');c.textContent=':';
+    row.appendChild(sh);row.appendChild(c);row.appendChild(smi);row.appendChild(sap);g.appendChild(row)}
+  function parse(v){var m=/^(\d{4})-(\d{2})(?:-(\d{2}))?(?:T(\d{2}):(\d{2}))?/.exec(v||'');return m?{y:+m[1],m:+m[2],d:+(m[3]||1),H:m[4]==null?null:+m[4],M:m[5]==null?0:+m[5]}:null}
+  function fillYear(){
+    var mn=parse(inp.getAttribute('min')),mx=parse(inp.getAttribute('max')),cur=sy.value,lo,hi;
+    lo=mn?mn.y:mx?mx.y-5:now.getFullYear()-1;hi=mx?mx.y:mn?mn.y+3:now.getFullYear()+3;
+    var p=parse(NS.get.call(inp));if(p){lo=Math.min(lo,p.y);hi=Math.max(hi,p.y)}
+    sy.innerHTML='';op(sy,'','Year');for(var y=lo;y<=hi;y++)op(sy,String(y),String(y));sy.value=cur}
+  function fillDay(){if(!sd)return;var cur=sd.value,y=+sy.value||2000,m=+sm.value||1,n=new Date(y,m,0).getDate();
+    sd.innerHTML='';op(sd,'','Day');for(var d=1;d<=n;d++)op(sd,String(d),String(d));if(cur)sd.value=String(Math.min(+cur,n))}
+  function h24(){return (+sh.value%12)+(sap.value==='PM'?12:0)}
+  function read(){
+    var y=sy.value,m=sm.value,d=sd?sd.value:'1';if(!y||!m||!d)return '';
+    var s=y+'-'+pad(m)+(hasDay?'-'+pad(d):'');if(hasTime)s+='T'+pad(h24())+':'+smi.value;return s}
+  function show(v){
+    var p=parse(v);
+    if(!p){sm.value='';sy.value='';if(sd){fillDay();sd.value=''}return}
+    if(![].some.call(sy.options,function(o){return o.value===String(p.y)}))fillYear();
+    sy.value=String(p.y);sm.value=String(p.m);fillDay();if(sd)sd.value=String(p.d);
+    if(hasTime&&p.H!=null){var h=p.H%12||12;sh.value=String(h);sap.value=p.H>=12?'PM':'AM';
+      if(![].some.call(smi.options,function(o){return o.value===pad(p.M)}))op(smi,pad(p.M),pad(p.M));smi.value=pad(p.M)}}
+  function commit(){
+    fillDay();var v=read();
+    if(v&&kind!=='datetime-local'){var mn=inp.getAttribute('min'),mx=inp.getAttribute('max');if(mx&&v>mx)v=mx;if(mn&&v<mn)v=mn}
+    if(v)show(v);
+    if(v!==NS.get.call(inp)){NS.set.call(inp,v);inp.dispatchEvent(new Event('change',{bubbles:true}))}}
+  g.addEventListener('change',function(e){e.stopPropagation();commit()});
+  Object.defineProperty(inp,'value',{get:function(){return NS.get.call(inp)},set:function(v){NS.set.call(inp,v);show(NS.get.call(inp))},configurable:true});
+  inp.focus=function(){sm.focus()};
+  inp.style.display='none';inp.insertAdjacentElement('afterend',g);
+  fillYear();fillDay();show(NS.get.call(inp));
+  new MutationObserver(function(){fillYear();show(NS.get.call(inp))}).observe(inp,{attributes:true,attributeFilter:['min','max']})}
+function scan(r){if(r.querySelectorAll)r.querySelectorAll(SEL).forEach(enhance)}
+scan(document);
+new MutationObserver(function(ms){ms.forEach(function(m){m.addedNodes.forEach(function(n){if(n.nodeType===1){if(n.matches&&n.matches(SEL))enhance(n);scan(n)}})})}).observe(document.documentElement,{childList:true,subtree:true});
+})();
+</script>
 </head>
 <body>
 <main>
