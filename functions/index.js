@@ -11,6 +11,38 @@ initializeApp();
 const TZ = 'Asia/Manila';
 const clock = t => new Date(t).toLocaleTimeString('en-PH', {hour: 'numeric', minute: '2-digit', timeZone: TZ});
 
+// Sends one message to each token, tries the temporary failures once more, removes tokens that are no longer valid,
+// and writes a pushLog record when something still failed (the admin can read pushLog in the Firebase console).
+const DEAD = /registration-token-not-registered|invalid-registration-token|invalid-argument/;
+async function sendTokens(db, coll, tokens, title, body, tag, what) {
+  if (!tokens.length) return;
+  const msg = token => ({token, data: {title, body, tag}, webpush: {headers: {Urgency: 'high'}}});
+  let res = await getMessaging().sendEach(tokens.map(msg));
+  const dead = [];
+  let retry = [];
+  res.responses.forEach((r, i) => {
+    const code = (r.error && r.error.code) || '';
+    if (r.success) return;
+    if (DEAD.test(code)) dead.push(tokens[i]); else retry.push(tokens[i]);
+  });
+  let failed = [];
+  if (retry.length) {
+    await new Promise(ok => setTimeout(ok, 2000));
+    res = await getMessaging().sendEach(retry.map(msg));
+    res.responses.forEach((r, i) => {
+      if (r.success) return;
+      const code = (r.error && r.error.code) || 'error';
+      if (DEAD.test(code)) dead.push(retry[i]); else failed.push(code);
+    });
+  }
+  await Promise.all(dead.map(t => db.collection(coll).doc(t).delete()));
+  if (failed.length) {
+    console.error('push failed', what, failed.length, 'of', tokens.length);
+    await db.collection('pushLog').add({what, tag, sent: tokens.length - failed.length - dead.length, failed: failed.length,
+      removed: dead.length, codes: [...new Set(failed)].slice(0, 5), time: Date.now()});
+  }
+}
+
 // pref is one of: in, out, absent (the toggles in the parent app)
 async function pushTo(emails, pref, title, body, tag) {
   const db = getFirestore();
@@ -20,20 +52,24 @@ async function pushTo(emails, pref, title, body, tag) {
     const snap = await db.collection('pushTokens').where('email', 'in', list.slice(i, i + 30)).get();
     snap.forEach(d => { const p = d.get('prefs') || {}; if (p[pref] !== false) tokens.push(d.id); });
   }
-  if (!tokens.length) return;
-  const res = await getMessaging().sendEach(tokens.map(token => ({
-    token,
-    data: {title, body, tag},
-    webpush: {headers: {Urgency: 'high'}}
-  })));
-  // Remove tokens that are no longer valid.
-  const dead = [];
-  res.responses.forEach((r, i) => {
-    const code = (r.error && r.error.code) || '';
-    if (!r.success && /registration-token-not-registered|invalid-registration-token|invalid-argument/.test(code)) dead.push(tokens[i]);
-  });
-  await Promise.all(dead.map(t => db.collection('pushTokens').doc(t).delete()));
+  await sendTokens(db, 'pushTokens', tokens, title, body, tag, 'parent:' + pref);
 }
+
+// The adviser(s) of a section get a notification when a parent sends an absence note.
+exports.notifyAbsenceNote = onDocumentCreated('absenceNotes/{id}', async event => {
+  const n = event.data && event.data.data();
+  if (!n || !n.section) return;
+  const db = getFirestore();
+  const advisers = (await db.collection('staff').where('sections', 'array-contains', n.section).get()).docs
+    .filter(d => d.get('role') === 'adviser').map(d => d.id);
+  const tokens = [];
+  for (let i = 0; i < advisers.length; i += 30) {
+    (await db.collection('staffTokens').where('uid', 'in', advisers.slice(i, i + 30)).get()).forEach(d => tokens.push(d.id));
+  }
+  const why = {sick: 'sick', family: 'family reason', weather: 'weather', other: 'other reason'}[n.reason] || 'absent';
+  await sendTokens(db, 'staffTokens', tokens, `Absence note: ${n.kidName || 'a learner'}`,
+    `${n.section} - ${why}${n.message ? '. ' + String(n.message).slice(0, 100) : ''}`, 'note-' + event.params.id, 'adviser:absenceNote');
+});
 
 // A child taps in or out
 exports.notifyTap = onDocumentCreated('log/{id}', async event => {
