@@ -3,8 +3,8 @@
   "private": true,
   "type": "commonjs",
   "scripts": {
-    "test:logic": "node --test tests/logic.test.js",
-    "test:rules": "firebase emulators:exec --only firestore --project demo-tapin \"node --test tests/rules.test.js\"",
+    "test:logic": "node --test test/logic.test.js",
+    "test:rules": "firebase emulators:exec --only firestore --project demo-tapin \"node --test test/rules.test.js\"",
     "test": "npm run test:logic && npm run test:rules"
   },
   "devDependencies": {
