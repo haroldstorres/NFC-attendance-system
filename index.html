@@ -1547,7 +1547,7 @@ function sf2Sheet(){
     box(H0,1,H0+2,1,"LEARNER'S NAME\n(Last Name, First Name, Middle Name)",H);
     box(H0,DC,H0,EA-1,'(1st row for date)',st({font:{b:true,sz:8},fill:'E7E6E6'}));
     cols.forEach((c,i)=>{const rb=c.wd===6;
-      put(H0+1,DC+i,c.cls?c.d:'',st({font:{b:true},fill:'E7E6E6',rb}));
+      put(H0+1,DC+i,c.d,st({font:{b:true},fill:'E7E6E6',rb}));
       put(H0+2,DC+i,WD[c.wd],st({font:{b:true,sz:8},fill:'E7E6E6',rb}))});
     box(H0,EA,H0,EA+1,'Total for the Month',st({font:{b:true,sz:8},fill:'E7E6E6'}));
     box(H0+1,EA,H0+2,EA,'ABSENT',H);box(H0+1,EA+1,H0+2,EA+1,'PRESENT',H);
@@ -1575,7 +1575,7 @@ function sf2Sheet(){
     put(R,EA,sum(tot.abs),T2);put(R,EA+1,sum(tot.pres),T2);put(R,EA+2,'',T2);R+=2;
     // Guidelines
     const W=Math.round(5+38+nd*4.5+9+9+26),TXT=st({nb:true,al:{horizontal:'left',vertical:'top'}});
-    const para=(txt,s)=>{box(R,0,R,LAST,txt,s||TXT);rh[R]={hpt:Math.max(13,Math.ceil(txt.length/(W*1.05))*12.5)};R++};
+    const para=(txt,s)=>{box(R,0,R,LAST,txt,s||TXT);rh[R]={hpt:Math.max(13,Math.ceil(txt.length/(W*1.3))*12.5)};R++};
     para('GUIDELINES:',st({nb:true,font:{b:true},al:{horizontal:'left'}}));
     ['1. The attendance shall be accomplished daily. Refer to the codes for checking learners\' attendance.',
      '2. Dates shall be written in the columns after the Learner\'s Name.',
@@ -1616,7 +1616,7 @@ function sf2Sheet(){
     sig(14,24,val('sfHead'),'(Signature of School Head over Printed Name)');
     box(R-1,14,R-1,24,'Attested by:',st({nb:true,al:{horizontal:'left'}}));R+=2;
     ws['!ref']=X.utils.encode_range({s:{r:0,c:0},e:{r:Math.max(maxR,R),c:LAST}});
-    ws['!merges']=mg;ws['!rows']=rh;
+    ws['!merges']=mg;ws['!rows']=rh;ws['!views']=[{showGridLines:false}];
     ws['!cols']=[{wch:5},{wch:38}].concat(cols.map(()=>({wch:4.5})),[{wch:9},{wch:9},{wch:26}]);
     ws['!pageSetup']={orientation:'landscape',paperSize:5,fitToWidth:1,fitToHeight:0};
     ws['!sheetPr']={pageSetUpPr:{fitToPage:true}};
