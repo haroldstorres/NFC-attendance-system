@@ -912,17 +912,19 @@ function askDlg(o){return new Promise(res=>{
   el.querySelector('#askT').textContent=title;
   const p=el.querySelector('#askM');p.textContent=body;p.hidden=!body;
   const inp=el.querySelector('#askI'),no=el.querySelector('#askNo'),yes=el.querySelector('#askYes');
+  let sel=null;if(o.select){sel=document.createElement('select');sel.id='askS';sel.setAttribute('aria-label',o.select.label||'Choose');sel.style.cssText='width:100%;margin:10px 0 4px';
+    o.select.options.forEach(x=>{const op=document.createElement('option');op.value=x.value;op.textContent=x.label;if(x.value===o.select.value)op.selected=true;sel.appendChild(op)});p.after(sel)}
   inp.hidden=!o.input;no.textContent=o.cancel||'Cancel';yes.textContent=o.ok||(o.input?'Save':'OK');if(o.danger)yes.classList.add('danger');
   const had=document.body.classList.contains('modal-open');document.body.classList.add('modal-open');
   const done=v=>{document.removeEventListener('keydown',key,true);el.remove();if(!had)document.body.classList.remove('modal-open');try{prev&&prev.focus&&prev.focus()}catch(e){}res(v)};
-  const ok=()=>done(o.input?inp.value:true),cancel=()=>done(o.input?null:false);
+  const ok=()=>done(sel?sel.value:o.input?inp.value:true),cancel=()=>done(o.input||sel?null:false);
   function key(e){
     if(e.key==='Escape'){e.preventDefault();e.stopPropagation();cancel()}
     else if(e.key==='Enter'&&e.target===inp){e.preventDefault();ok()}
-    else if(e.key==='Tab'){const f=[...el.querySelectorAll('input:not([hidden]),button')],i=f.indexOf(document.activeElement);e.preventDefault();f[(i+(e.shiftKey?-1:1)+f.length)%f.length].focus()}}
+    else if(e.key==='Tab'){const f=[...el.querySelectorAll('input:not([hidden]),select,button')],i=f.indexOf(document.activeElement);e.preventDefault();f[(i+(e.shiftKey?-1:1)+f.length)%f.length].focus()}}
   document.addEventListener('keydown',key,true);
   el.onclick=e=>{if(e.target===el)cancel()};no.onclick=cancel;yes.onclick=ok;
-  document.body.appendChild(el);(o.input?inp:o.danger?no:yes).focus()})}
+  document.body.appendChild(el);(sel?sel:o.input?inp:o.danger?no:yes).focus()})}
 const ask=(message,o={})=>askDlg({message,...o});
 const askText=(message,o={})=>askDlg({message,input:true,...o});
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1253,6 +1255,7 @@ function fillKd(k){
   if(k.altName||k.altPhone)rows.push(['Alternate contact',[esc(k.altName||''),k.altPhone?tel(k.altPhone):''].filter(Boolean).join('<br>')]);
   rows.push(['Parent email',em.length?em.map(esc).join('<br>'):'Not set']);
   if(adv.length)rows.push(['Class adviser',adv.map(esc).join('<br>')]);
+  if((k.enrolHistory||[]).length)rows.push(['Earlier enrollment',k.enrolHistory.map(h=>esc((REASONL[h.reason]||'Left')+(h.from?' from '+h.from:'')+(h.year?' ('+h.year+')':'')+(h.left?', '+new Date(h.left).toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'numeric'}):'')+(h.back?'. Back '+new Date(h.back).toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'numeric'}):'')+(h.to?' in '+h.to:''))).join('<br>')]);
   if(k.contactUpdatedAt)rows.push(['Contact update','Changed by a parent on '+new Date(k.contactUpdatedAt).toLocaleDateString('en-PH',{month:'long',day:'numeric',year:'numeric'})]);
   $('kdInfo').innerHTML=rows.map(r=>`<dt>${r[0]}</dt><dd>${r[1]}</dd>`).join('');
   $('kdCard').textContent=assigning===k.id?'Waiting for a tap...':(k.uid?'Replace card':'Link card')}
@@ -1620,7 +1623,7 @@ function renderYear(){
   $('yeResume').hidden=!yeLoad().length;
   const ar=kidsRaw.filter(k=>k.archived).sort((a,b)=>cmp(a.name||'',b.name||''));
   $('yeArchHead').textContent='Archived children ('+ar.length+')';
-  const ah=ar.length?ar.map(k=>`<div class="row" style="margin:8px 0"><span><strong>${esc(k.name||'')}</strong><div class="note">${esc(k.archivedFrom||'')} · ${k.archivedReason==='left'?'Left school':k.archivedReason==='transferred'?'Transferred out':'Graduated'}${k.archivedYear?' · '+esc(k.archivedYear):''}</div></span><button class="btn alt sm" data-yr="${esc(k.id)}" type="button">Restore</button></div>`).join(''):'<p class="note">No archived children.</p>';
+  const ah=ar.length?ar.map(k=>`<div class="row" style="margin:8px 0"><span><strong>${esc(k.name||'')}</strong><div class="note">${esc(k.archivedFrom||'')} · ${esc(REASONL[k.archivedReason]||'Graduated')}${k.archivedYear?' · '+esc(k.archivedYear):''}</div></span><button class="btn alt sm" data-yr="${esc(k.id)}" type="button">Restore</button></div>`).join(''):'<p class="note">No archived children.</p>';
   const al=$('yeArchList');if(al.dataset.h!==ah){al.innerHTML=ah;al.dataset.h=ah}
 }
 $('yeRows').addEventListener('change',e=>{const s=e.target.closest('[data-yg]');if(!s)return;yeAct[s.dataset.yg]=s.value;renderYear()});
@@ -1650,18 +1653,25 @@ $('yeGo').onclick=async()=>{
   yeSave(keep);await yeRun(keep)};
 $('yeResumeBtn').onclick=async()=>{if(!navigator.onLine){toast('Connect to the internet first.');return}const r=yeLoad();if(r.length)await yeRun(r)};
 $('yeDropBtn').onclick=async()=>{if(await ask('Cancel the unfinished change? Children already moved stay where they are.',{title:'Cancel',ok:'Cancel it',danger:true})){yeSave([]);renderYear()}};
+const REASONL={left:'Left school',transferred:'Transferred out',graduated:'Graduated'};
 $('yeArchList').addEventListener('click',async e=>{const b=e.target.closest('[data-yr]');if(!b)return;
   const k=kidsRaw.find(x=>x.id===b.dataset.yr);if(!k)return;
-  const to=k.archivedFrom||k.section||'';
-  if(!(await ask('Restore '+(k.name||'this child')+(to?' to '+to:'')+'?',{title:'Restore',ok:'Restore'})))return;
+  const from=k.archivedFrom||'',names=secList.map(x=>x.name);
+  const opts=names.map(n=>({value:n,label:n+(n===from?' (where they left)':'')}));
+  if(from&&!names.some(n=>n.toLowerCase()===from.toLowerCase()))opts.unshift({value:from,label:from+' (where they left, section no longer in the list)'});
+  const left=(REASONL[k.archivedReason]||'Left')+(from?' from '+from:'')+(k.archivedYear?', '+k.archivedYear:'');
+  const to=await askDlg({title:'Restore '+(k.name||'this child'),message:left+'.\nWhich section is '+(k.name||'the child')+' in now? The old section is saved in their record.',select:{options:opts,value:from||(opts[0]&&opts[0].value)||'',label:'Section'},ok:'Restore'});
+  if(to===null)return;
   try{
     if(to&&!secList.some(s=>s.name.toLowerCase()===to.toLowerCase()))await addDoc(collection(db,'sections'),{name:to});
     const u={archived:deleteField(),archivedAt:deleteField(),archivedReason:deleteField(),archivedFrom:deleteField(),archivedYear:deleteField()};
     if(to)u.section=to;
+    // Keep a short history so the record still says where the child was before (shown in the child's details).
+    u.enrolHistory=(k.enrolHistory||[]).concat([{from,reason:k.archivedReason||'left',year:k.archivedYear||'',left:k.archivedAt||0,back:Date.now(),to:to||''}]).slice(-10);
     if(k.uid&&kids.some(o=>o.uid===k.uid))u.uid=deleteField(); // the card now belongs to someone else
     await updateDoc(doc(db,'kids',k.id),u);
     if(to&&k.id in photoMap)await updateDoc(doc(db,'kidPhotos',k.id),{section:to}).catch(()=>{});
-    toast('Restored')}
+    toast('Restored to '+(to||'no section'))}
   catch(x){toast('Could not restore ('+(x.code||x.message)+')')}});
 // --- Import children from CSV
 const IMPH={last:['last','lastname','surname','familyname','apelyido'],first:['first','firstname','givenname','pangalan'],mid:['middle','middlename','mi','middleinitial'],name:['name','fullname','learnername','learnersname'],
