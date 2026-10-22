@@ -91,6 +91,8 @@ textarea{resize:vertical;min-height:84px}
 .mo{position:fixed;inset:0;z-index:50;background:rgba(5,15,24,.62);display:flex;align-items:flex-end;justify-content:center}
 .ms{background:var(--bg);color:var(--ink);width:100%;max-width:520px;height:min(720px,90vh);overflow:auto;border-radius:22px 22px 0 0;padding:16px 16px calc(20px + env(safe-area-inset-bottom,0px))}
 @media(min-width:600px){.mo{align-items:center}.ms{border-radius:22px}}
+/* Announcement cards: long messages are clipped, tap the card to read all */
+.ann .annb{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;white-space:pre-wrap}
 /* School announcement popup: centered, as tall as its message */
 #amodal{align-items:center;padding:20px;box-sizing:border-box}
 #amodal .ms{height:auto;max-height:80vh;max-width:420px;border-radius:22px;padding-bottom:20px}
@@ -506,9 +508,11 @@ function renderAnn(items){
   if(!shown.length){$('annBadge').hidden=true;$('ann').innerHTML='<div class="card"><strong>No announcements</strong><p class="note">Notices from the school in the last 14 days appear here.</p></div>';return}
   const unread=shown.some(b=>b.time>seen),nUn=shown.filter(b=>b.time>seen).length;$('annBadge').hidden=!nUn;$('annBadge').textContent=nUn;
   $('ann').innerHTML='<div class="row"><strong>From the school</strong>'+(unread?'<button class="btn alt sm" id="annRead">Mark as read</button>':'')+'</div>'
-    +shown.map(b=>`<div class="card ann ${b.time>seen?'new':''}" role="button" tabindex="0" data-ann="${esc(b.id)}" style="cursor:pointer"><div class="row"><span class="big">${esc(b.title||'School announcement')}</span>${b.time>seen?'<span class="pill in">New</span>':''}</div><div class="note">${esc(fdt(b.time))}</div><p>${esc(b.body)}</p></div>`).join('');
+    +shown.map(b=>`<div class="card ann ${b.time>seen?'new':''}" role="button" tabindex="0" data-ann="${esc(b.id)}" style="cursor:pointer"><div class="row"><span class="big">${esc(b.title||'School announcement')}</span>${b.time>seen?'<span class="pill in">New</span>':''}</div><div class="note">${esc(fdt(b.time))}</div><p class="annb">${esc(b.body)}</p>${(b.body||'').length>120?'<div class="note">Tap to read more</div>':''}${b.time>seen?`<div class="row" style="justify-content:flex-end;margin-top:8px"><button class="btn sm" type="button" data-annread="${esc(b.id)}">Mark as read</button></div>`:''}</div>`).join('');
   const rb=$('annRead');if(rb)rb.onclick=e=>{e.stopPropagation();setSeen(newest);renderAnn(annItems)}
-  document.querySelectorAll('[data-ann]').forEach(c=>{c.onclick=()=>openAnn(c.dataset.ann);c.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openAnn(c.dataset.ann)}}})}
+  document.querySelectorAll('[data-ann]').forEach(c=>{
+    c.onclick=e=>{const r=e.target.closest('[data-annread]');if(r){e.stopPropagation();const it=annItems.find(x=>x.id===r.dataset.annread);if(it){setSeen(Math.max(getSeen(),it.time));renderAnn(annItems)}return}openAnn(c.dataset.ann)};
+    c.onkeydown=e=>{if(e.target!==c)return;if(e.key==='Enter'||e.key===' '){e.preventDefault();openAnn(c.dataset.ann)}}})}
 // Tap an announcement to read the whole message.
 function openAnn(id){
   const b=annItems.find(x=>x.id===id);if(!b)return;
