@@ -384,8 +384,8 @@ function start(user){$('pwBtn').hidden=false;goTabParam();
     s=>renderAnn(s.docs.map(d=>({id:d.id,...d.data()})).filter(b=>b.audience!=='tv')),()=>{});
   const em=user.email.toLowerCase();
   unsubC=[
-    onSnapshot(query(collection(db,'kids'),where('parentEmails','array-contains',em)),s=>{kidsReady=true;kidsRaw=s.docs.map(d=>({id:d.id,...d.data()}));myKids=kidsRaw.map(withPh);renderContacts();if(allLogs)render(allLogs);renderReport()},()=>{}),
-    onSnapshot(query(collection(db,'kidPhotos'),where('parentEmails','array-contains',em)),s=>{photoMap={};s.docs.forEach(d=>{photoMap[d.id]=d.data().photo||''});myKids=kidsRaw.map(withPh);renderContacts();if(allLogs)render(allLogs);renderReport();if(mKid)renderModal()},()=>{}),
+    onSnapshot(query(collection(db,'kids'),where('parentEmails','array-contains',em)),s=>{kidsReady=true;kidsRaw=s.docs.map(d=>({id:d.id,...d.data()}));myKids=kidsRaw.filter(k=>!k.archived).map(withPh);renderContacts();if(allLogs)render(allLogs);renderReport()},()=>{}),
+    onSnapshot(query(collection(db,'kidPhotos'),where('parentEmails','array-contains',em)),s=>{photoMap={};s.docs.forEach(d=>{photoMap[d.id]=d.data().photo||''});myKids=kidsRaw.filter(k=>!k.archived).map(withPh);renderContacts();if(allLogs)render(allLogs);renderReport();if(mKid)renderModal()},()=>{}),
     onSnapshot(doc(db,'settings','school'),s=>{const d=s.exists()?s.data():{};parentEdit=!!d.parentEdit;parentReq=!!d.parentRequests;showBrand(d);renderContacts();renderReport()},()=>{parentEdit=false;parentReq=false;renderContacts()}),
     onSnapshot(query(collection(db,'changeRequests'),where('parentEmail','==',em)),s=>{myReqs=s.docs.map(d=>({id:d.id,...d.data()}));renderContacts()},()=>{}),
     onSnapshot(query(collection(db,'childReports'),where('parentEmail','==',em)),s=>{myReports=s.docs.map(d=>({id:d.id,...d.data()}));if(mKid)renderModal()},()=>{}),
