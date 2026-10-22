@@ -589,6 +589,7 @@ body.is-login #toast{background:#fff;color:#16323a;box-shadow:0 6px 20px rgba(0,
 
 <section id="tab-myclass">
   <div class="seg" id="mcTabs" role="tablist" aria-label="My sections" hidden></div>
+  <div id="mcPush" class="card" hidden></div>
   <p class="note" id="mcNone" hidden>No section is assigned to you yet. Please ask the admin to assign your class.</p>
   <div id="mcWrap" hidden>
     <div id="mcHead"></div>
@@ -861,6 +862,7 @@ body.is-login #toast{background:#fff;color:#16323a;box-shadow:0 6px 20px rgba(0,
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,createUserWithEmailAndPassword,sendPasswordResetEmail,signOut,updatePassword,reauthenticateWithCredential,EmailAuthProvider} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 import {initializeAppCheck,ReCaptchaV3Provider} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app-check.js";
+import {getMessaging,getToken} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging.js";
 import {getFirestore,initializeFirestore,persistentLocalCache,persistentMultipleTabManager,collection,addDoc,updateDoc,deleteDoc,getDoc,getDocs,writeBatch,setDoc,deleteField,doc,query,where,orderBy,onSnapshot} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
 // Paste the config from the Firebase console here (Project settings > Your apps > Web app).
@@ -926,6 +928,21 @@ const askText=(message,o={})=>askDlg({message,input:true,...o});
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt=t=>new Date(t).toLocaleTimeString('en-PH',{hour:'numeric',minute:'2-digit'});
 function toast(m){const t=$('toast');t.textContent=m;t.classList.add('on');clearTimeout(toast.h);toast.h=setTimeout(()=>t.classList.remove('on'),2600)}
+// --- Phone notification for advisers when a parent sends a new absence note. Needs the same Web Push key as the parent app.
+const VAPID_KEY=''; // Firebase console > Project settings > Cloud Messaging > Web Push certificates > Key pair
+async function staffPushToken(){
+  if(!VAPID_KEY||!('Notification' in window)||Notification.permission!=='granted'||!('serviceWorker' in navigator))return '';
+  try{const reg=await navigator.serviceWorker.ready;return await getToken(getMessaging(app),{vapidKey:VAPID_KEY,serviceWorkerRegistration:reg})}catch(e){return ''}}
+async function saveStaffPush(){
+  const u=auth.currentUser;if(!u)return;const t=await staffPushToken();if(!t)return;
+  try{await setDoc(doc(db,'staffTokens',t),{uid:u.uid,time:Date.now()})}catch(e){}}
+function renderStaffPush(){
+  const b=$('mcPush'),ok=myRole==='adviser'&&!!VAPID_KEY&&('Notification' in window)&&('serviceWorker' in navigator);
+  b.hidden=!ok;if(!ok)return;
+  b.innerHTML='<strong>Phone notifications</strong><p class="note">Get a notification on this phone when a parent sends an absence note for your section.</p>'
+    +(Notification.permission==='denied'?'<p class="note">Notifications are blocked for this app. Allow them in your phone or browser settings.</p>'
+    :Notification.permission==='granted'?'<p class="note">On for this device.</p>':'<button class="btn sm" id="mcPushOn" type="button">Turn on notifications</button>')}
+$('mcPush').onclick=async e=>{if(e.target.id!=='mcPushOn')return;try{await Notification.requestPermission()}catch(_){}await saveStaffPush();renderStaffPush()};
 
 function showTab(t){document.querySelectorAll('nav button').forEach(x=>x.setAttribute('aria-selected',x.dataset.tab===t));
   document.querySelectorAll('section').forEach(s=>s.classList.toggle('on',s.id==='tab-'+t));if(t==='log')renderLogList()}
@@ -964,6 +981,7 @@ onAuthStateChanged(auth,async user=>{
   document.body.classList.toggle('role-head',myRole==='head');
   lockSchool();lockSfLogos(myRole==='head');
   showTab(myRole==='adviser'?'myclass':myRole==='head'?'dashboard':'tap');
+  renderStaffPush();if(myRole==='adviser')saveStaffPush();
   unsub.push(onSnapshot(doc(db,'settings','school'),s=>applySchool(s.exists()?s.data():{},admin),()=>{}));
   unsub.push(onSnapshot(doc(db,'settings','sf2logos'),s=>applySfLogos(s.exists()?s.data():{},admin,s.exists()),()=>{}));
   unsub.push(onSnapshot(collection(db,'holidays'),s=>{holList=s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>a.id<b.id?-1:1);Object.keys(holidayMap).forEach(k=>delete holidayMap[k]);holList.forEach(h=>holidayMap[h.id]=h.name||'No classes');renderHol();if(sfLast&&sfMode==='m')drawSF2()},()=>{}));
