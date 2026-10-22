@@ -861,7 +861,7 @@ body.is-login #toast{background:#fff;color:#16323a;box-shadow:0 6px 20px rgba(0,
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,createUserWithEmailAndPassword,sendPasswordResetEmail,signOut,updatePassword,reauthenticateWithCredential,EmailAuthProvider} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
-import {initializeAppCheck,ReCaptchaV3Provider} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app-check.js";
+import {initializeAppCheck,ReCaptchaEnterpriseProvider} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app-check.js";
 import {getMessaging,getToken} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging.js";
 import {getFirestore,initializeFirestore,persistentLocalCache,persistentMultipleTabManager,collection,addDoc,updateDoc,deleteDoc,getDoc,getDocs,writeBatch,setDoc,deleteField,doc,query,where,orderBy,onSnapshot} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
@@ -874,12 +874,12 @@ const firebaseConfig={
 };
 const app=initializeApp(firebaseConfig),auth=getAuth(app);
 // App Check: only this real website can talk to Firebase. Paste your reCAPTCHA v3 site key to turn it on (see the notes).
-const APPCHECK_SITE_KEY="";
-if(APPCHECK_SITE_KEY){try{if(location.hostname==="localhost")self.FIREBASE_APPCHECK_DEBUG_TOKEN=true;initializeAppCheck(app,{provider:new ReCaptchaV3Provider(APPCHECK_SITE_KEY),isTokenAutoRefreshEnabled:true})}catch(e){console.warn("App Check did not start",e)}}
+const APPCHECK_SITE_KEY="6Ldh9votAAAAAFuMGdovaafha7pdhZev_FRB8_-L";
+if(APPCHECK_SITE_KEY){try{if(location.hostname==="localhost")self.FIREBASE_APPCHECK_DEBUG_TOKEN=true;initializeAppCheck(app,{provider:new ReCaptchaEnterpriseProvider(APPCHECK_SITE_KEY),isTokenAutoRefreshEnabled:true})}catch(e){console.warn("App Check did not start",e)}}
 // Offline support: reads and writes are kept on this device and synced when the internet comes back.
 let db;try{db=initializeFirestore(app,{localCache:persistentLocalCache({tabManager:persistentMultipleTabManager()})})}catch(e){db=getFirestore(app)}
 const app2=initializeApp(firebaseConfig,'creator');
-if(APPCHECK_SITE_KEY){try{initializeAppCheck(app2,{provider:new ReCaptchaV3Provider(APPCHECK_SITE_KEY),isTokenAutoRefreshEnabled:true})}catch(e){}}
+if(APPCHECK_SITE_KEY){try{initializeAppCheck(app2,{provider:new ReCaptchaEnterpriseProvider(APPCHECK_SITE_KEY),isTokenAutoRefreshEnabled:true})}catch(e){}}
 const auth2=getAuth(app2); // used only to create staff logins without signing you out
 
 const COOLDOWN=60000;
@@ -931,7 +931,7 @@ const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'
 const fmt=t=>new Date(t).toLocaleTimeString('en-PH',{hour:'numeric',minute:'2-digit'});
 function toast(m){const t=$('toast');t.textContent=m;t.classList.add('on');clearTimeout(toast.h);toast.h=setTimeout(()=>t.classList.remove('on'),2600)}
 // --- Phone notification for advisers when a parent sends a new absence note. Needs the same Web Push key as the parent app.
-const VAPID_KEY=''; // Firebase console > Project settings > Cloud Messaging > Web Push certificates > Key pair
+const VAPID_KEY='BOkCV3IjFknI9a5hOS4w2YrkTzlTwDLsuVjXewLMlZIy-DzQX1rWs9vyw58z0A_WXFjSZGtqdtrJWSbFrRDNe8w'; // Firebase console > Project settings > Cloud Messaging > Web Push certificates > Key pair
 async function staffPushToken(){
   if(!VAPID_KEY||!('Notification' in window)||Notification.permission!=='granted'||!('serviceWorker' in navigator))return '';
   try{const reg=await navigator.serviceWorker.ready;return await getToken(getMessaging(app),{vapidKey:VAPID_KEY,serviceWorkerRegistration:reg})}catch(e){return ''}}
