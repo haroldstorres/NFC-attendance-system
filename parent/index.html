@@ -512,10 +512,13 @@ function renderAnn(items){
 // Tap an announcement to read the whole message.
 function openAnn(id){
   const b=annItems.find(x=>x.id===id);if(!b)return;
+  const isNew=b.time>getSeen();
   closeAnn();const el=document.createElement('div');el.id='amodal';el.className='mo';
-  el.innerHTML=`<div class="ms" role="dialog" aria-modal="true" aria-labelledby="aTitle"><div class="row"><span class="big" id="aTitle">${esc(b.title||'School announcement')}</span><button class="btn alt sm" type="button" data-aclose aria-label="Close">Close</button></div><div class="note">${esc(fdt(b.time))}</div><p style="white-space:pre-wrap;margin:10px 0 0">${esc(b.body)}</p></div>`;
-  el.onclick=e=>{if(e.target.id==='amodal'||e.target.closest('[data-aclose]'))closeAnn()};
-  document.body.appendChild(el);document.body.style.overflow='hidden';const c=el.querySelector('[data-aclose]');if(c)c.focus()}
+  el.innerHTML=`<div class="ms" role="dialog" aria-modal="true" aria-labelledby="aTitle"><div class="row"><div><span class="big" id="aTitle">${esc(b.title||'School announcement')}</span><div class="note">${esc(fdt(b.time))}</div></div>${isNew?'<span class="pill in">New</span>':''}</div><p style="white-space:pre-wrap;margin:12px 0 0">${esc(b.body)}</p><div class="row" style="justify-content:flex-end;gap:8px;margin-top:18px"><button class="btn alt sm" type="button" data-aclose>Close</button>${isNew?'<button class="btn sm" type="button" data-aread>Mark as read</button>':''}</div></div>`;
+  el.onclick=e=>{
+    if(e.target.closest('[data-aread]')){setSeen(Math.max(getSeen(),b.time));renderAnn(annItems);closeAnn();return}
+    if(e.target.id==='amodal'||e.target.closest('[data-aclose]'))closeAnn()};
+  document.body.appendChild(el);document.body.style.overflow='hidden';const c=el.querySelector('[data-aread]')||el.querySelector('[data-aclose]');if(c)c.focus()}
 function closeAnn(){const el=$('amodal');if(el)el.remove();if(!mKid)document.body.style.overflow=''}
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeAnn()});
 
