@@ -202,6 +202,7 @@ html[data-theme="light"] .stat{background:linear-gradient(135deg,color-mix(in sr
 <div class="spot" id="spot" aria-live="polite"><div class="spwrap n1" id="spWrap"></div></div>
 
 <script type="module">
+import {initializeAppCheck,ReCaptchaV3Provider} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app-check.js";
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,signOut} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 import {getFirestore,collection,doc,getDoc,query,where,orderBy,limit,onSnapshot} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
@@ -213,7 +214,11 @@ const firebaseConfig={
   appId:"1:1069393649004:web:dafcf9afdf265f9c83e749"
 };
 // Own app name = own sign-in session, so the TV account never mixes with the staff app's login in the same browser.
-const app=initializeApp(firebaseConfig,'tvdisplay'),auth=getAuth(app),db=getFirestore(app);
+const app=initializeApp(firebaseConfig,'tvdisplay'),auth=getAuth(app);
+// App Check: only this real website can talk to Firebase. Paste your reCAPTCHA v3 site key to turn it on (see the notes).
+const APPCHECK_SITE_KEY="";
+if(APPCHECK_SITE_KEY){try{if(location.hostname==="localhost")self.FIREBASE_APPCHECK_DEBUG_TOKEN=true;initializeAppCheck(app,{provider:new ReCaptchaV3Provider(APPCHECK_SITE_KEY),isTokenAutoRefreshEnabled:true})}catch(e){console.warn("App Check did not start",e)}}
+const db=getFirestore(app);
 
 const $=id=>document.getElementById(id);
 const hue=s=>{let h=0;for(const c of String(s||''))h=(h*31+c.charCodeAt(0))%360;return h};
@@ -354,11 +359,17 @@ $('fsBtn').onclick=()=>{
 
 /* ---------- data ---------- */
 async function loadKid(id){
-  if(!id||kidCache.has(id))return;
+  if(!id)return;const c0=kidCache.get(id);if(c0&&c0.photoDone)return;
   if(pending.has(id))return pending.get(id);
   const pr=(async()=>{
-    try{const s=await getDoc(doc(db,'kids',id));kidCache.set(id,s.exists()?{photo:s.data().photo||'',section:s.data().section||''}:{})}
-    catch(e){kidCache.set(id,{})}
+    const cur=kidCache.get(id)||{};
+    try{
+      let section=cur.section,ph=cur.photo||'';
+      if(section===undefined){const s=await getDoc(doc(db,'kids',id));if(!s.exists()){kidCache.set(id,{photoDone:true});return}section=s.data().section||'';ph=s.data().photo||''}
+      // Photos are kept in kidPhotos/<id>, loaded only for the children who actually tap.
+      if(!ph){try{const q=await getDoc(doc(db,'kidPhotos',id));ph=q.exists()?(q.data().photo||''):''}catch(e){}}
+      kidCache.set(id,{photo:ph,section:section||'',photoDone:true})
+    }catch(e){kidCache.set(id,{...cur,photoDone:true})}
   })();
   pending.set(id,pr);await pr;pending.delete(id);render();
 }
@@ -435,7 +446,7 @@ function start(){
   },()=>{}));
   unsubs.push(onSnapshot(collection(db,'kids'),s=>{
     kidIds=new Set();
-    s.docs.forEach(x=>{const d=x.data();kidIds.add(x.id);kidCache.set(x.id,{photo:d.photo||'',section:d.section||''})});
+    s.docs.forEach(x=>{const d=x.data(),old=kidCache.get(x.id)||{};kidIds.add(x.id);kidCache.set(x.id,{photo:d.photo||old.photo||'',section:d.section||'',photoDone:!!(d.photo||old.photoDone)})});
     renderStats();render();
   },()=>{}));
   unsubs.push(onSnapshot(query(collection(db,'visitors'),where('timeIn','>=',d0.getTime())),s=>{
@@ -454,7 +465,7 @@ function start(){
       const added=[];
       s.docChanges().forEach(c=>{if(c.type==='added'&&!firstSnap)added.push({id:c.doc.id,...c.doc.data()})});
       taps=s.docs.map(x=>({id:x.id,...x.data()}));
-      taps.forEach(t=>loadKid(t.kidId));
+      taps.slice(0,60).forEach(t=>loadKid(t.kidId));
       if(taps[0]){$('lastScan').hidden=false;$('lastScan').textContent='Last tap: '+timeStr(taps[0].time)}
       renderStats();render();
       if(added.length){added.sort((a,b)=>a.time-b.time);if(spotOn)added.slice(-MAXSP).forEach(t=>{spotChain=spotChain.then(()=>pushSpot(t)).catch(()=>{})});else chime()}
