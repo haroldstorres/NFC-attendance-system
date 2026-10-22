@@ -544,7 +544,7 @@ body.is-login #toast{background:#fff;color:#16323a;box-shadow:0 6px 20px rgba(0,
         <h2 class="kd-name" id="kdName"></h2>
         <div class="kd-tags" id="kdTags"></div>
         <dl class="kd-dl" id="kdInfo"></dl>
-        <div class="kd-act"><button class="btn alt" id="kdCard" type="button"></button><button class="btn" id="kdEdit" type="button">Edit</button><button class="btn alt kd-del" id="kdDel" type="button">Remove</button></div>
+        <div class="kd-act"><button class="btn alt" id="kdCard" type="button"></button><button class="btn" id="kdEdit" type="button">Edit</button><button class="btn alt" id="kdArch" type="button">Transferred / left</button><button class="btn alt kd-del" id="kdDel" type="button">Remove</button></div>
       </div>
     </div>
   </div>
@@ -1263,6 +1263,14 @@ $('kdModal').onclick=e=>{if(e.target===$('kdModal'))closeKd()};
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('kdModal').hidden)closeKd()});
 $('kdCard').onclick=()=>{if(!kdId)return;assigning=kdId;toast('Tap the new card now.');closeKd();render()};
 $('kdEdit').onclick=()=>{const k=kids.find(x=>x.id===kdId);if(!k)return;closeKd();openKid(k)};
+// Archive one child (transferred to another school, or stopped coming). Same record the year-end reset uses, so it shows in
+// Manage > School > Archived children and can be restored there. The child's taps and past attendance are kept.
+$('kdArch').onclick=async()=>{const k=kids.find(x=>x.id===kdId);if(!k)return;
+  if(!navigator.onLine){toast('Connect to the internet first.');return}
+  if(!(await ask(k.name+' will no longer appear in the lists, the tap screen or SF2. Their past taps are kept, and you can restore them in Manage > School > Archived children.',{title:'Transferred or left school?',ok:'Archive'})))return;
+  const id=k.id;closeKd();
+  try{await updateDoc(doc(db,'kids',id),{archived:true,archivedAt:Date.now(),archivedReason:'transferred',archivedFrom:k.section||'',archivedYear:($('sfYear').value||'').trim()});toast(k.name+' archived.')}
+  catch(e){toast('Could not archive ('+(e.code||e.message)+').')}};
 $('kdDel').onclick=async()=>{if(!kdId||!(await ask('Remove this child?',{title:'Remove child',ok:'Remove',danger:true})))return;const id=kdId;closeKd();deleteDoc(doc(db,'kids',id)).then(()=>deleteDoc(doc(db,'kidPhotos',id)).catch(()=>{})).catch(()=>toast('Could not remove.'))};
 
 // Offline banner and the list of taps that are saved on this device but not sent yet.
@@ -1612,7 +1620,7 @@ function renderYear(){
   $('yeResume').hidden=!yeLoad().length;
   const ar=kidsRaw.filter(k=>k.archived).sort((a,b)=>cmp(a.name||'',b.name||''));
   $('yeArchHead').textContent='Archived children ('+ar.length+')';
-  const ah=ar.length?ar.map(k=>`<div class="row" style="margin:8px 0"><span><strong>${esc(k.name||'')}</strong><div class="note">${esc(k.archivedFrom||'')} · ${k.archivedReason==='left'?'Left school':'Graduated'}${k.archivedYear?' · '+esc(k.archivedYear):''}</div></span><button class="btn alt sm" data-yr="${esc(k.id)}" type="button">Restore</button></div>`).join(''):'<p class="note">No archived children.</p>';
+  const ah=ar.length?ar.map(k=>`<div class="row" style="margin:8px 0"><span><strong>${esc(k.name||'')}</strong><div class="note">${esc(k.archivedFrom||'')} · ${k.archivedReason==='left'?'Left school':k.archivedReason==='transferred'?'Transferred out':'Graduated'}${k.archivedYear?' · '+esc(k.archivedYear):''}</div></span><button class="btn alt sm" data-yr="${esc(k.id)}" type="button">Restore</button></div>`).join(''):'<p class="note">No archived children.</p>';
   const al=$('yeArchList');if(al.dataset.h!==ah){al.innerHTML=ah;al.dataset.h=ah}
 }
 $('yeRows').addEventListener('change',e=>{const s=e.target.closest('[data-yg]');if(!s)return;yeAct[s.dataset.yg]=s.value;renderYear()});
