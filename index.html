@@ -1539,7 +1539,7 @@ function buildSF2(ks,lg,o){
     if(o.overrides&&d in o.overrides)cls=o.overrides[d];
     if(dt>t0)cls=false;days.push({d,wd,cls})}
   const rows=ks.map(k=>{
-    const marks=days.map(x=>{if(!x.cls)return '';const a=o.adj&&o.adj[k.id+'|'+x.d];if(a)return a;const t=(first[k.id]||{})[x.d];if(t===undefined)return 'A';
+    const marks=days.map(x=>{if(!x.cls)return '';const a=o.adj&&o.adj[k.id+'|'+x.d];if(a)return a;const t=(first[k.id]||{})[x.d];if(t===undefined)return (k.activeFrom&&new Date(o.year,o.month,x.d).getTime()<k.activeFrom)?'':'A';
       const dt=new Date(t);return dt.getHours()*60+dt.getMinutes()>ch*60+cm?'T':'P'});
     let abs=0,tar=0,run=0,best=0;
     marks.forEach((m,i)=>{if(!days[i].cls)return;if(m==='A'){abs++;run++;best=Math.max(best,run)}else{run=0;if(m==='T')tar++}});
@@ -1666,6 +1666,8 @@ $('yeArchList').addEventListener('click',async e=>{const b=e.target.closest('[da
     if(to&&!secList.some(s=>s.name.toLowerCase()===to.toLowerCase()))await addDoc(collection(db,'sections'),{name:to});
     const u={archived:deleteField(),archivedAt:deleteField(),archivedReason:deleteField(),archivedFrom:deleteField(),archivedYear:deleteField()};
     if(to)u.section=to;
+    // From today on, days with no tap count as absent. Days before this (while the child was away) stay blank in the reports.
+    {const t0=new Date();t0.setHours(0,0,0,0);u.activeFrom=t0.getTime()}
     // Keep a short history so the record still says where the child was before (shown in the child's details).
     u.enrolHistory=(k.enrolHistory||[]).concat([{from,reason:k.archivedReason||'left',year:k.archivedYear||'',left:k.archivedAt||0,back:Date.now(),to:to||''}]).slice(-10);
     if(k.uid&&kids.some(o=>o.uid===k.uid))u.uid=deleteField(); // the card now belongs to someone else
@@ -1916,7 +1918,7 @@ function drawRep(){sfMode='r';
   const L=sfLast,r=sfCalc(),sd=r.schoolDays,v=i=>esc($(i).value),pc=(a,b)=>b?Math.round(a/b*100)+'%':'–',
     mon=new Date(L.y,L.m-1,1).toLocaleString('en-PH',{month:'long',year:'numeric'}),
     exc={};(L.adj||[]).forEach(a=>{if(a.status==='A'&&a.excused)exc[a.kidId+'|'+a.day]=1});
-  const rows=r.rows.map(x=>{let e=0;x.marks.forEach((m,i)=>{if(m==='A'&&exc[x.kid.id+'|'+(i+1)])e++});return {...x,exc:e,pres:Math.max(0,sd-x.abs)}});
+  const rows=r.rows.map(x=>{let e=0;x.marks.forEach((m,i)=>{if(m==='A'&&exc[x.kid.id+'|'+(i+1)])e++});return {...x,exc:e,pres:x.marks.filter(m=>m==='P'||m==='T').length}});
   sfRepX={rows,sd,mon,sec:L.sec||'All sections'};
   const N=rows.length,sum=(a,f)=>a.reduce((t,x)=>t+f(x),0),presT=sum(rows,x=>x.pres),absT=sum(rows,x=>x.abs),excT=sum(rows,x=>x.exc),tarT=sum(rows,x=>x.tar),perfect=rows.filter(x=>sd&&!x.abs&&!x.tar).length;
   const tile=(b,t)=>`<div><b>${b}</b><span>${t}</span></div>`;
