@@ -149,3 +149,44 @@ test('manilaNow: crosses the date line correctly (UTC evening is already tomorro
   assert.equal(t.ds, '2027-1-1', 'same unpadded format the app uses for alert ids');
   assert.equal(t.minutes, 60);
 });
+
+// ---------- year-end: move up a grade, archive graduates ----------
+test('year-end: nextGrade adds one to the number; names without a number have no next grade', () => {
+  const L = appLogic();
+  assert.equal(L.nextGrade('Grade 5'), 'Grade 6');
+  assert.equal(L.nextGrade('Grade 9'), 'Grade 10');
+  assert.equal(L.nextGrade('Kinder'), '');
+});
+test('year-end: defaults move every grade up, the highest graduates, un-numbered names are kept', () => {
+  const L = appLogic();
+  assert.deepEqual(L.yearEndDefaults(['Grade 1', 'Grade 6', 'Kinder']), {'Grade 1': 'up', 'Grade 6': 'grad', 'Kinder': 'keep'});
+});
+test('year-end: kids move from the list as it is now, so grades do not chain; same section name; graduates are archived', () => {
+  const L = appLogic();
+  const kids = [
+    {id: 'a', name: 'A', section: 'Grade 5 - Rizal'},
+    {id: 'b', name: 'B', section: 'Grade 6 - Rizal'},
+    {id: 'c', name: 'C', section: 'Kinder - Sampaguita'},
+    {id: 'd', name: 'D', section: 'Grade 5 - Rizal', archived: true},   // already archived: ignored
+    {id: 'e', name: 'E', section: ''}                                    // no section: ignored
+  ];
+  const act = {'Grade 5': 'up', 'Grade 6': 'grad', 'Kinder': 'keep'};
+  const p = L.yearEndPlan(kids, ['Grade 5 - Rizal', 'Grade 6 - Rizal', 'Kinder - Sampaguita'], act);
+  assert.deepEqual(p.moves.map(m => [m.id, m.to]), [['a', 'Grade 6 - Rizal']]);   // reuses the section that already exists
+  assert.deepEqual(p.archive.map(m => [m.id, m.reason, m.from]), [['b', 'graduated', 'Grade 6 - Rizal']]);
+  assert.deepEqual(p.newSecs, []);
+});
+test('year-end: a section that does not exist yet is listed once; "left school" is its own reason', () => {
+  const L = appLogic();
+  const kids = [{id: 'a', section: 'Grade 1 - Mabini'}, {id: 'b', section: 'Grade 1 - Mabini'}, {id: 'c', section: 'Grade 3 - Luna'}];
+  const p = L.yearEndPlan(kids, ['Grade 1 - Mabini', 'Grade 3 - Luna'], {'Grade 1': 'up', 'Grade 3': 'left'});
+  assert.deepEqual(p.newSecs, ['Grade 2 - Mabini']);
+  assert.equal(p.moves.length, 2);
+  assert.equal(p.archive[0].reason, 'left');
+});
+test('year-end: a grade with no section name moves to the next grade with no section name', () => {
+  const L = appLogic();
+  const p = L.yearEndPlan([{id: 'a', section: 'Grade 2'}], ['Grade 2'], {'Grade 2': 'up'});
+  assert.deepEqual(p.moves.map(m => m.to), ['Grade 3']);
+  assert.deepEqual(p.newSecs, ['Grade 3']);
+});
