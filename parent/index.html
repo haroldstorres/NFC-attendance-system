@@ -199,6 +199,17 @@ body.is-login #toast{background:#fff;color:#16323a;box-shadow:0 6px 20px rgba(0,
     <h2 id="loginTitle">Log in</h2>
     <label for="em">Email address</label><div class="fld"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg><input id="em" type="email" autocomplete="username"></div>
     <label for="pw">Password</label><div class="fld"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg><input id="pw" type="password" autocomplete="current-password"><button type="button" class="eye" id="pwEye" aria-label="Show password"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
+    <div id="consentBox" hidden style="margin:10px 0;font-size:.95rem">
+      <label style="display:flex;gap:8px;align-items:flex-start"><input type="checkbox" id="consentChk" style="width:auto;margin-top:4px"><span>I have read the privacy notice and I agree that the school may collect and use my child's attendance records and my contact details as described.</span></label>
+      <details style="margin-top:6px"><summary style="cursor:pointer;color:var(--link)">Read the privacy notice</summary>
+        <div style="margin-top:6px;line-height:1.45">
+          <p><b>What the school collects.</b> Your child's name, section, photo (if provided), the time of each card tap at the school gate, attendance records, and your name, mobile number and email address.</p>
+          <p><b>Why.</b> To record attendance, to tell you when your child arrives or leaves, to contact you about attendance, and to prepare the school's official attendance reports (such as SF2).</p>
+          <p><b>Who can see it.</b> Authorised school staff, your child's class adviser and the school head. The hallway screen shows a child's name and, depending on the school's setting, a photo, at the moment of a tap. Your information is not sold or shared with other parties.</p>
+          <p><b>How long.</b> Records are kept for the school year and for as long as the school is required to keep attendance records, then deleted or archived.</p>
+          <p><b>Your rights.</b> Under the Data Privacy Act of 2012 (RA 10173) you may ask the school to see, correct or delete your information, or withdraw this consent, by contacting the school office or its Data Protection Officer.</p>
+        </div></details>
+    </div>
     <button type="button" class="go" id="goBtn">Log in</button>
     <button type="button" class="lk" id="fpBtn">Forgot password?</button>
     <button type="button" class="lk" id="swapBtn">No account yet? Sign up</button>
@@ -311,12 +322,16 @@ let signup=false,unsub=null,unsubB=null,unsubC=[];
 $('em').onkeydown=$('pw').onkeydown=e=>{if(e.key==='Enter')$('goBtn').click()};
 const EYE_ON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',EYE_OFF='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 6.2A10 10 0 0112 6c6.5 0 10 6 10 6a17 17 0 01-3.2 3.9M6.5 7.8A17 17 0 002 12s3.5 6 10 6a10 10 0 004-.8"/><path d="M9.9 9.9a3 3 0 004.2 4.2"/></svg>';
 $('pwEye').onclick=()=>{const p=$('pw'),show=p.type==='password';p.type=show?'text':'password';$('pwEye').innerHTML=show?EYE_OFF:EYE_ON;$('pwEye').setAttribute('aria-label',show?'Hide password':'Show password')};
-$('swapBtn').onclick=()=>{signup=!signup;$('fpBtn').hidden=signup;$('loginTitle').textContent=signup?'Create an account':'Log in';$('goBtn').textContent=signup?'Sign up':'Log in';$('swapBtn').textContent=signup?'Have an account? Log in':'No account yet? Sign up'};
+$('swapBtn').onclick=()=>{signup=!signup;$('consentBox').hidden=!signup;$('fpBtn').hidden=signup;$('loginTitle').textContent=signup?'Create an account':'Log in';$('goBtn').textContent=signup?'Sign up':'Log in';$('swapBtn').textContent=signup?'Have an account? Log in':'No account yet? Sign up'};
 $('goBtn').onclick=async()=>{
   const e=$('em').value.trim().toLowerCase(),p=$('pw').value;
   if(!e||p.length<6){toast('Enter your email and a password of at least 6 characters.');return}
   try{
-    if(signup){const c=await createUserWithEmailAndPassword(auth,e,p);await sendEmailVerification(c.user)}
+    if(signup){
+      if(!$('consentChk').checked){toast('Please read the privacy notice and tick the box to agree.');return}
+      const c=await createUserWithEmailAndPassword(auth,e,p);
+      try{await setDoc(doc(db,'consents',c.user.uid),{email:e,time:Date.now(),version:1})}catch(x){}
+      await sendEmailVerification(c.user)}
     else await signInWithEmailAndPassword(auth,e,p);
   }catch(err){toast({'auth/email-already-in-use':'This email already has an account. Log in instead.','auth/weak-password':'The password is too short.'}[err.code]||'That did not work. Check your email and password.')}};
 $('fpBtn').onclick=async()=>{const e=$('em').value.trim().toLowerCase();if(!e){toast('Enter your email first.');return}
